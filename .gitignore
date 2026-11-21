@@ -1,0 +1,36 @@
+
+# Flutter
+karigor_khoj/.dart_tool/
+karigor_khoj/.packages
+karigor_khoj/.flutter-plugins
+karigor_khoj/.flutter-plugins-dependencies
+karigor_khoj/build/
+karigor_khoj/.idea/
+karigor_khoj/android/local.properties
+
+# Django / Python
+karigor_backend/venv/
+karigor_backend/.venv/
+karigor_backend/env/
+karigor_backend/__pycache__/
+karigor_backend/**/__pycache__/
+karigor_backend/*.py[cod]
+karigor_backend/db.sqlite3
+karigor_backend/staticfiles/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+**/secrets.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
