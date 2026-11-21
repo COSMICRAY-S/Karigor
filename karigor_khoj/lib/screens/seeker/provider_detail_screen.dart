@@ -27,16 +27,18 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
     try {
       final provider = await ApiService.getProviderById(widget.providerId);
       final reviews = await ApiService.getProviderReviews(widget.providerId);
-      setState(() {
-        _provider = provider;
-        _reviews = reviews;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       if (mounted) {
+        setState(() {
+          _provider = provider;
+          _reviews = reviews;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('ত্রুটি: তথ্য লোড করা যায়নি। ($e)'),
@@ -49,6 +51,13 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
 
   void _sendJobRequest() {
     final auth = context.read<AuthProvider>();
+    if (auth.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('কাজের অনুরোধ পাঠাতে অনুগ্রহ করে লগইন করুন')),
+      );
+      return;
+    }
+
     final descController = TextEditingController();
     final locController = TextEditingController();
     final amountController = TextEditingController();
@@ -98,14 +107,15 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (descController.text.isEmpty) {
+              final desc = descController.text.trim();
+              if (desc.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('কাজের বিবরণ লিখুন')),
                 );
                 return;
               }
 
-              final amount = double.tryParse(amountController.text) ?? 0.0;
+              final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
               if (amount <= 0.0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('অনুগ্রহ করে সঠিক বাজেট দিন')),
@@ -119,8 +129,8 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                 final success = await ApiService.sendJobRequest(
                   seekerId: auth.currentUser!.id,
                   karigorId: _provider!.id,
-                  description: descController.text,
-                  location: locController.text,
+                  description: desc,
+                  location: locController.text.trim(),
                   amount: amount,
                 );
 
@@ -158,8 +168,10 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_provider == null) {
-      return const Scaffold(
-          body: Center(child: Text('কারিগর খুঁজে পাওয়া যায়নি')));
+      return Scaffold(
+        appBar: AppBar(title: const Text('কারিগর প্রোফাইল')),
+        body: const Center(child: Text('কারিগর খুঁজে পাওয়া যায়নি')),
+      );
     }
 
     final p = _provider!;
@@ -171,7 +183,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
             expandedHeight: 200,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(p.name),
+              title: Text(p.name, style: const TextStyle(shadows: [Shadow(color: Colors.black45, blurRadius: 4)])),
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -227,7 +239,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                       style: TextStyle(
                           fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text(p.bio,
+                  Text(p.bio.isNotEmpty ? p.bio : 'কোনো পরিচিতি বিবরণ দেওয়া নেই।',
                       style:
                       const TextStyle(fontSize: 15, height: 1.5)),
                   const SizedBox(height: 24),
@@ -243,9 +255,9 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                       : Column(
                     children: _reviews
                         .map((r) => _ReviewCard(
-                      name: r['seeker_name'] ?? '',
-                      rating: r['rating'] ?? 0,
-                      comment: r['comment'] ?? '',
+                      name: r['seeker_name']?.toString() ?? '',
+                      rating: (r['rating'] is num ? (r['rating'] as num).round() : int.tryParse('${r['rating']}') ?? 0),
+                      comment: r['comment']?.toString() ?? '',
                     ))
                         .toList(),
                   ),
@@ -273,7 +285,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                 label: const Text('কল করুন'),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${p.phone} তে কল করছে...')),
+                    SnackBar(content: Text('${p.phone} তে কল করা হচ্ছে...')),
                   );
                 },
               ),
@@ -326,7 +338,9 @@ class _InfoRow extends StatelessWidget {
         Icon(icon, size: 18, color: const Color(0xFF1B5E20)),
         const SizedBox(width: 8),
         Text('$label: ', style: const TextStyle(color: Colors.grey)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+        Expanded(
+          child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+        ),
       ],
     );
   }
@@ -350,14 +364,14 @@ class _ReviewCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(name,
+                Text(name.isNotEmpty ? name : 'ব্যবহারকারী',
                     style:
                     const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
                 Row(
                   children: List.generate(
                     5,
-                        (i) => Icon(
+                    (i) => Icon(
                       i < rating ? Icons.star : Icons.star_border,
                       color: Colors.amber,
                       size: 16,
@@ -366,8 +380,10 @@ class _ReviewCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(comment),
+            if (comment.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(comment),
+            ],
           ],
         ),
       ),

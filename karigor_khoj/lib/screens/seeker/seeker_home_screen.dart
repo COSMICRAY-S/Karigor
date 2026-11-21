@@ -68,10 +68,12 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() {
-          _isGettingLocation = false;
-          _locationLabel = 'GPS বন্ধ আছে';
-        });
+        if (mounted) {
+          setState(() {
+            _isGettingLocation = false;
+            _locationLabel = 'GPS বন্ধ আছে';
+          });
+        }
         await _loadProviders();
         return;
       }
@@ -83,10 +85,12 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        setState(() {
-          _isGettingLocation = false;
-          _locationLabel = 'অনুমতি নেই';
-        });
+        if (mounted) {
+          setState(() {
+            _isGettingLocation = false;
+            _locationLabel = 'অনুমতি নেই';
+          });
+        }
         await _loadProviders();
         return;
       }
@@ -95,20 +99,24 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      setState(() {
-        _seekerLat = pos.latitude;
-        _seekerLng = pos.longitude;
-        _isGettingLocation = false;
-        _locationLabel =
-            '${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
-      });
+      if (mounted) {
+        setState(() {
+          _seekerLat = pos.latitude;
+          _seekerLng = pos.longitude;
+          _isGettingLocation = false;
+          _locationLabel =
+              '${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
+        });
+      }
 
       await _loadProviders(category: _selectedCategory);
     } catch (e) {
-      setState(() {
-        _isGettingLocation = false;
-        _locationLabel = 'ত্রুটি';
-      });
+      if (mounted) {
+        setState(() {
+          _isGettingLocation = false;
+          _locationLabel = 'ত্রুটি';
+        });
+      }
       await _loadProviders();
     }
   }
@@ -138,13 +146,17 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
         lng: _seekerLng,
         radius: 5.0,
       );
-      setState(() {
-        _providers = providers;
-        _isLoadingProviders = false;
-      });
+      if (mounted) {
+        setState(() {
+          _providers = providers;
+          _isLoadingProviders = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingProviders = false);
-      _showErrorSnackBar('লোড করতে ত্রুটি: $e');
+      if (mounted) {
+        setState(() => _isLoadingProviders = false);
+        _showErrorSnackBar('লোড করতে ত্রুটি: $e');
+      }
     }
   }
 
@@ -154,13 +166,17 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
     setState(() => _isLoadingRequests = true);
     try {
       final requests = await ApiService.getJobsForSeeker(auth.currentUser!.id);
-      setState(() {
-        _myRequests = requests;
-        _isLoadingRequests = false;
-      });
+      if (mounted) {
+        setState(() {
+          _myRequests = requests;
+          _isLoadingRequests = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingRequests = false);
-      _showErrorSnackBar('অনুরোধসমূহ লোড করতে ত্রুটি: $e');
+      if (mounted) {
+        setState(() => _isLoadingRequests = false);
+        _showErrorSnackBar('অনুরোধসমূহ লোড করতে ত্রুটি: $e');
+      }
     }
   }
 
@@ -177,13 +193,17 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
         lng: _seekerLng,
         radius: 20.0, // wider radius for search
       );
-      setState(() {
-        _searchResults = results;
-        _isSearching = false;
-      });
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isSearching = false);
-      _showErrorSnackBar('অনুসন্ধান ব্যর্থ: $e');
+      if (mounted) {
+        setState(() => _isSearching = false);
+        _showErrorSnackBar('অনুসন্ধান ব্যর্থ: $e');
+      }
     }
   }
 
@@ -202,6 +222,11 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
   // ─── Complete & Rate job ───────────────────────────────────
 
   void _completeAndRateJob(int jobId, int providerId) {
+    if (providerId <= 0) {
+      _showErrorSnackBar('ত্রুটি: কারিগরের তথ্য পাওয়া যায়নি');
+      return;
+    }
+
     final commentController = TextEditingController();
     int selectedRating = 5;
 
@@ -268,18 +293,22 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                   await ApiService.updateJobStatus(jobId, 'completed');
                   await ApiService.addReview(
                       providerId, auth.currentUser!.id, selectedRating, comment);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          '✅ কাজ সম্পন্ন হয়েছে এবং রেটিং সফলভাবে জমা হয়েছে!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  _loadMyRequests();
-                  _loadProviders(category: _selectedCategory);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            '✅ কাজ সম্পন্ন হয়েছে এবং রেটিং সফলভাবে জমা হয়েছে!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    _loadMyRequests();
+                    _loadProviders(category: _selectedCategory);
+                  }
                 } catch (e) {
-                  setState(() => _isLoadingRequests = false);
-                  _showErrorSnackBar('ত্রুটি: $e');
+                  if (mounted) {
+                    setState(() => _isLoadingRequests = false);
+                    _showErrorSnackBar('ত্রুটি: $e');
+                  }
                 }
               },
               child: const Text('সম্পন্ন করুন'),
@@ -569,7 +598,10 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
         itemCount: _myRequests.length,
         itemBuilder: (ctx, index) {
           final req = _myRequests[index];
-          final status = req['status'] as String;
+          final status = req['status']?.toString() ?? 'pending';
+          final jobId = req['id'] is int ? req['id'] as int : int.tryParse('${req['id']}') ?? 0;
+          final karigorId = req['karigor_id'] is int ? req['karigor_id'] as int : int.tryParse('${req['karigor_id']}') ?? 0;
+
           Color statusColor = Colors.orange;
           String statusText = 'অপেক্ষমান';
 
@@ -597,7 +629,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        req['karigor_name'] ?? 'কারিগর',
+                        req['karigor_name']?.toString() ?? 'কারিগর',
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 16),
                       ),
@@ -618,7 +650,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(req['description'] ?? '',
+                  Text(req['description']?.toString() ?? '',
                       style: const TextStyle(fontSize: 14)),
                   const SizedBox(height: 8),
                   Row(
@@ -626,9 +658,11 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                       const Icon(Icons.location_on,
                           size: 14, color: Colors.grey),
                       const SizedBox(width: 4),
-                      Text(req['location'] ?? 'ঠিকানা দেওয়া হয়নি',
-                          style: const TextStyle(
-                              color: Colors.grey, fontSize: 12)),
+                      Expanded(
+                        child: Text(req['location']?.toString() ?? 'ঠিকানা দেওয়া হয়নি',
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 12)),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -653,8 +687,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                         label: const Text('কাজটি সম্পন্ন হয়েছে'),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green),
-                        onPressed: () => _completeAndRateJob(
-                            req['id'], req['karigor_id'] ?? 0),
+                        onPressed: () => _completeAndRateJob(jobId, karigorId),
                       ),
                     ),
                   ],
@@ -669,7 +702,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
 
   Widget _buildProfileTab(AuthProvider auth) {
     final user = auth.currentUser;
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
@@ -719,7 +752,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
               ],
             ),
           ),
-          const Spacer(),
+          const SizedBox(height: 32),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red.shade700,

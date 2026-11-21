@@ -19,10 +19,11 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
   List<dynamic> _jobs = [];
   List<ProviderModel> _providers = [];
   bool _isLoading = true;
+  bool _isSavingProfile = false;
+  bool _isUpdatingLocation = false;
 
   // Profile Tab controllers
   final _bioController = TextEditingController();
-  final _rateController = TextEditingController();
   String _selectedCategory = 'প্লাম্বার';
 
   // Search Tab state
@@ -53,7 +54,6 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
   @override
   void dispose() {
     _bioController.dispose();
-    _rateController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -68,7 +68,9 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
       final profile = await ApiService.getProviderById(auth.currentUser!.id);
       if (profile != null) {
         _isOnline = profile.isOnline;
-        _selectedCategory = profile.category;
+        if (_categories.contains(profile.category)) {
+          _selectedCategory = profile.category;
+        }
         _bioController.text = profile.bio;
       }
 
@@ -78,14 +80,18 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
       // 3. Load nearby providers
       final providers = await ApiService.getProviders();
 
-      setState(() {
-        _jobs = jobs;
-        _providers = providers.where((p) => p.id != auth.currentUser!.id).toList(); // Exclude self
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _jobs = jobs;
+          _providers = providers.where((p) => p.id != auth.currentUser!.id).toList(); // Exclude self
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorSnackBar('লোড করতে ত্রুটি: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showErrorSnackBar('লোড করতে ত্রুটি: $e');
+      }
     }
   }
 
@@ -95,7 +101,6 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
 
     setState(() {
       _isOnline = val;
-      _isLoading = true;
     });
 
     try {
@@ -109,10 +114,10 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
         );
       }
     } catch (e) {
-      setState(() => _isOnline = !val); // Revert status
-      _showErrorSnackBar('স্ট্যাটাস পরিবর্তনে ব্যর্থতা: $e');
-    } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isOnline = !val); // Revert status
+        _showErrorSnackBar('স্ট্যাটাস পরিবর্তনে ব্যর্থতা: $e');
+      }
     }
   }
 
@@ -120,7 +125,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
     final auth = context.read<AuthProvider>();
     if (auth.currentUser == null) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isUpdatingLocation = true);
 
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -155,9 +160,13 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
         );
       }
     } catch (e) {
-      _showErrorSnackBar('${e.toString().replaceAll('Exception: ', '')}');
+      if (mounted) {
+        _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isUpdatingLocation = false);
+      }
     }
   }
 
@@ -181,8 +190,41 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
         }
       }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorSnackBar('ত্রুটি: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showErrorSnackBar('ত্রুটি: $e');
+      }
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.currentUser == null) return;
+
+    setState(() => _isSavingProfile = true);
+    try {
+      final success = await ApiService.updateProfile(
+        auth.currentUser!.id,
+        category: _selectedCategory,
+        bio: _bioController.text.trim(),
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ প্রোফাইল সফলভাবে সংরক্ষিত হয়েছে'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('প্রোফাইল সংরক্ষণ ব্যর্থ: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingProfile = false);
+      }
     }
   }
 
@@ -194,13 +236,17 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
     });
     try {
       final results = await ApiService.getProviders(category: query.trim());
-      setState(() {
-        _searchResults = results;
-        _isSearching = false;
-      });
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isSearching = false);
-      _showErrorSnackBar('অনুসন্ধান ব্যর্থ: $e');
+      if (mounted) {
+        setState(() => _isSearching = false);
+        _showErrorSnackBar('অনুসন্ধান ব্যর্থ: $e');
+      }
     }
   }
 
@@ -313,9 +359,11 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: ProviderCard(
                       provider: _providers[i],
-                      onTap: () {
-                        // View other provider detail if needed
-                      },
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/provider-detail',
+                        arguments: _providers[i].id,
+                      ),
                     ),
                   ),
                   childCount: _providers.length,
@@ -356,7 +404,9 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
         itemCount: _jobs.length,
         itemBuilder: (ctx, i) {
           final job = _jobs[i];
-          final status = job['status'];
+          final status = job['status']?.toString() ?? 'pending';
+          final jobId = job['id'] is int ? job['id'] as int : int.tryParse('${job['id']}') ?? 0;
+
           Color statusColor = Colors.orange;
           String statusLabel = 'অপেক্ষায়';
 
@@ -383,7 +433,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                     children: [
                       const Icon(Icons.person, size: 18, color: Colors.grey),
                       const SizedBox(width: 6),
-                      Text(job['seeker_name'] ?? 'গ্রাহক', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(job['seeker_name']?.toString() ?? 'গ্রাহক', style: const TextStyle(fontWeight: FontWeight.bold)),
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -397,14 +447,16 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Text(job['description'] ?? '', style: const TextStyle(fontSize: 15)),
+                  Text(job['description']?.toString() ?? '', style: const TextStyle(fontSize: 15)),
                   const SizedBox(height: 8),
-                  if (job['location'] != null && job['location'] != '')
+                  if (job['location'] != null && job['location'].toString().isNotEmpty)
                     Row(
                       children: [
                         const Icon(Icons.location_on, size: 14, color: Colors.grey),
                         const SizedBox(width: 4),
-                        Text(job['location'], style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                        Expanded(
+                          child: Text(job['location'].toString(), style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                        ),
                       ],
                     ),
                   const SizedBox(height: 4),
@@ -412,7 +464,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                     children: [
                       const Icon(Icons.phone, size: 14, color: Colors.grey),
                       const SizedBox(width: 4),
-                      Text(job['seeker_phone'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      Text(job['seeker_phone']?.toString() ?? '', style: const TextStyle(color: Colors.grey, fontSize: 13)),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -432,7 +484,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                               foregroundColor: Colors.red,
                               side: const BorderSide(color: Colors.red),
                             ),
-                            onPressed: () => _updateJobStatus(job['id'], 'rejected'),
+                            onPressed: () => _updateJobStatus(jobId, 'rejected'),
                             child: const Text('প্রত্যাখ্যান'),
                           ),
                         ),
@@ -440,7 +492,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                         Expanded(
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100)),
-                            onPressed: () => _updateJobStatus(job['id'], 'accepted'),
+                            onPressed: () => _updateJobStatus(jobId, 'accepted'),
                             child: const Text('গ্রহণ করুন'),
                           ),
                         ),
@@ -454,7 +506,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                         icon: const Icon(Icons.check),
                         label: const Text('কাজ সম্পন্ন হয়েছে'),
-                        onPressed: () => _updateJobStatus(job['id'], 'completed'),
+                        onPressed: () => _updateJobStatus(jobId, 'completed'),
                       ),
                     ),
                   ],
@@ -516,7 +568,11 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: ProviderCard(
                               provider: _searchResults[i],
-                              onTap: () {},
+                              onTap: () => Navigator.pushNamed(
+                                context,
+                                '/provider-detail',
+                                arguments: _searchResults[i].id,
+                              ),
                             ),
                           ),
                         ),
@@ -604,8 +660,10 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100)),
-                    onPressed: _updateGPSLocation,
-                    child: const Text('অপ্টিমাইজ GPS'),
+                    onPressed: _isUpdatingLocation ? null : _updateGPSLocation,
+                    child: _isUpdatingLocation
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('অপ্টিমাইজ GPS'),
                   ),
                 ],
               ),
@@ -616,10 +674,12 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
           const Text('সেবার ধরন (Category)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _selectedCategory,
+            value: _categories.contains(_selectedCategory) ? _selectedCategory : _categories.first,
             decoration: const InputDecoration(prefixIcon: Icon(Icons.work)),
             items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-            onChanged: (val) => setState(() => _selectedCategory = val!),
+            onChanged: (val) {
+              if (val != null) setState(() => _selectedCategory = val);
+            },
           ),
           const SizedBox(height: 16),
 
@@ -636,13 +696,11 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100)),
-              icon: const Icon(Icons.save),
+              icon: _isSavingProfile
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.save),
               label: const Text('প্রোফাইল সংরক্ষণ করুন'),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('✅ প্রোফাইল সফলভাবে সংরক্ষিত হয়েছে')),
-                );
-              },
+              onPressed: _isSavingProfile ? null : _saveProfile,
             ),
           ),
           const SizedBox(height: 16),
@@ -674,20 +732,20 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
 
     String title = auth.currentUser?.name ?? 'কারিগর ড্যাশবোর্ড';
     if (_currentIndex == 1) title = 'কাজের অনুরোধসমূহ';
-    if (_currentIndex == 2) title = 'অনান্য কারিগর খুঁজুন';
+    if (_currentIndex == 2) title = 'অন্যান্য কারিগর খুঁজুন';
     if (_currentIndex == 3) title = 'আমার প্রোফাইল সেটিংস';
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8E1),
       appBar: AppBar(
-        automaticallyImplyLeading: false, // Back button সরানো হলো
+        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFFE65100),
         title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.gps_fixed),
             tooltip: 'GPS লোকেশন আপডেট',
-            onPressed: _updateGPSLocation,
+            onPressed: _isUpdatingLocation ? null : _updateGPSLocation,
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -702,7 +760,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE65100)))
           : IndexedStack(
               index: _currentIndex,
               children: [
@@ -721,7 +779,9 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
           setState(() {
             _currentIndex = index;
           });
-          _loadProfileAndJobs();
+          if (index == 0 || index == 1) {
+            _loadProfileAndJobs();
+          }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'হোম'),

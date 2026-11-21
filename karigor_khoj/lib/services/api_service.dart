@@ -21,7 +21,15 @@ class ApiService {
     return 'http://localhost:3000/api';
   }
 
-  static const bool USE_MOCK = true;
+  static String _extractErrorMessage(http.Response response, String fallback) {
+    try {
+      final data = jsonDecode(response.body);
+      if (data is Map && data.containsKey('error')) {
+        return data['error'].toString();
+      }
+    } catch (_) {}
+    return '$fallback (${response.statusCode})';
+  }
 
   // ─── AUTH ────────────────────────────────────────────────
 
@@ -35,13 +43,12 @@ class ApiService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return UserModel.fromJson(data['user'], token: data['token']);
+        return UserModel.fromJson(data['user'], token: data['token']?.toString());
       } else {
-        final err = jsonDecode(response.body);
-        throw Exception(err['error'] ?? 'Login failed');
+        throw Exception(_extractErrorMessage(response, 'লগইন ব্যর্থ হয়েছে'));
       }
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -61,13 +68,12 @@ class ApiService {
       );
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        return UserModel.fromJson(data['user'], token: data['token']);
+        return UserModel.fromJson(data['user'], token: data['token']?.toString());
       } else {
-        final err = jsonDecode(response.body);
-        throw Exception(err['error'] ?? 'Registration failed');
+        throw Exception(_extractErrorMessage(response, 'নিবন্ধন ব্যর্থ হয়েছে'));
       }
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -81,11 +87,10 @@ class ApiService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        final err = jsonDecode(response.body);
-        throw Exception(err['error'] ?? 'Password reset failed');
+        throw Exception(_extractErrorMessage(response, 'পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে'));
       }
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -99,54 +104,56 @@ class ApiService {
   }) async {
     try {
       final queryParams = <String, String>{};
-      if (category != null) queryParams['category'] = category;
+      if (category != null && category.trim().isNotEmpty && category != 'সব') {
+        queryParams['category'] = category.trim();
+      }
       if (lat != null) queryParams['lat'] = lat.toString();
       if (lng != null) queryParams['lng'] = lng.toString();
       queryParams['radius'] = radius.toString();
 
       final uri = Uri.parse('$baseUrl/providers').replace(queryParameters: queryParams);
       final response = await http.get(uri);
-      print('DEBUG getProviders url: $uri');
-      print('DEBUG getProviders status: ${response.statusCode}');
-      print('DEBUG getProviders body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        print('DEBUG parsed ${data.length} providers');
-        return data.map((e) => ProviderModel.fromJson(e)).toList();
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded.map((e) => ProviderModel.fromJson(e as Map<String, dynamic>)).toList();
+        }
+        return [];
       } else {
-        throw Exception('Server error: ${response.statusCode}');
+        throw Exception(_extractErrorMessage(response, 'কারিগরদের তথ্য লোড করা যায়নি'));
       }
     } catch (e) {
-      print('DEBUG getProviders error: $e');
-      throw Exception('Provider load failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
   static Future<ProviderModel?> getProviderById(int id) async {
     try {
-      final response =
-      await http.get(Uri.parse('$baseUrl/providers/$id'));
+      final response = await http.get(Uri.parse('$baseUrl/providers/$id'));
       if (response.statusCode == 200) {
-        return ProviderModel.fromJson(jsonDecode(response.body));
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          return ProviderModel.fromJson(decoded);
+        }
       }
+      return null;
     } catch (e) {
-      throw Exception('Provider load failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
-    return null;
   }
 
   static Future<List<dynamic>> getProviderReviews(int karigorId) async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/providers/$karigorId/reviews'));
+      final response = await http.get(Uri.parse('$baseUrl/providers/$karigorId/reviews'));
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
       }
+      return [];
     } catch (e) {
-      throw Exception('Reviews load failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
-    return [];
   }
 
   static Future<bool> updateOnlineStatus(int providerId, bool isOnline) async {
@@ -158,7 +165,7 @@ class ApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Online status update failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -171,7 +178,24 @@ class ApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Location update failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  static Future<bool> updateProfile(int providerId, {String? category, String? bio}) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/providers/profile'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'provider_id': providerId,
+          if (category != null) 'service_category': category,
+          if (bio != null) 'bio': bio,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -184,7 +208,7 @@ class ApiService {
       );
       return response.statusCode == 201;
     } catch (e) {
-      throw Exception('Review submission failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -211,34 +235,34 @@ class ApiService {
       );
       return response.statusCode == 201;
     } catch (e) {
-      throw Exception('Job request failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
   static Future<List<dynamic>> getJobsForKarigor(int karigorId) async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/jobs/karigor/$karigorId'));
+      final response = await http.get(Uri.parse('$baseUrl/jobs/karigor/$karigorId'));
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
       }
+      return [];
     } catch (e) {
-      throw Exception('Jobs load failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
-    return [];
   }
 
   static Future<List<dynamic>> getJobsForSeeker(int seekerId) async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/jobs/seeker/$seekerId'));
+      final response = await http.get(Uri.parse('$baseUrl/jobs/seeker/$seekerId'));
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
       }
+      return [];
     } catch (e) {
-      throw Exception('Jobs load failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
-    return [];
   }
 
   static Future<bool> updateJobStatus(int jobId, String status) async {
@@ -250,7 +274,7 @@ class ApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Status update failed: $e');
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 }

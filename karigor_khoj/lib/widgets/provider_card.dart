@@ -62,11 +62,14 @@ class ProviderCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        provider.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Flexible(
+                        child: Text(
+                          provider.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                       if (provider.isVerified) ...[
@@ -79,11 +82,14 @@ class ProviderCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Text(
-                        provider.category,
-                        style: const TextStyle(
-                            color: Color(0xFF1B5E20),
-                            fontWeight: FontWeight.w500),
+                      Flexible(
+                        child: Text(
+                          provider.category,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Color(0xFF1B5E20),
+                              fontWeight: FontWeight.w500),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Container(
@@ -130,7 +136,7 @@ class ProviderCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             const Icon(Icons.arrow_forward_ios,
-                size: 14, color: Colors.grey),
+              size: 14, color: Colors.grey),
           ],
         ),
       ),
