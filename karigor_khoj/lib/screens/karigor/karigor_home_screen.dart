@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../services/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/provider_model.dart';
-import '../../widgets/provider_card.dart';
+import '../../theme/app_theme.dart';
 
 class KarigorHomeScreen extends StatefulWidget {
   const KarigorHomeScreen({super.key});
@@ -15,32 +15,64 @@ class KarigorHomeScreen extends StatefulWidget {
 
 class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
   int _currentIndex = 0;
-  bool _isOnline = false;
-  List<dynamic> _jobs = [];
-  List<ProviderModel> _providers = [];
+  bool _isOnline = true;
+  List<dynamic> _backendJobs = [];
   bool _isLoading = true;
   bool _isSavingProfile = false;
   bool _isUpdatingLocation = false;
 
-  // Profile Tab controllers
   final _bioController = TextEditingController();
-  String _selectedCategory = 'প্লাম্বার';
-
-  // Search Tab state
-  final _searchController = TextEditingController();
-  List<ProviderModel> _searchResults = [];
-  bool _isSearching = false;
-  bool _hasSearched = false;
+  String _selectedCategory = 'গ্যাস লাইন';
 
   final List<String> _categories = [
-    'প্লাম্বার',
+    'গ্যাস লাইন',
     'ইলেকট্রিশিয়ান',
-    'দর্জি',
-    'রঙ মিস্ত্রি',
+    'প্লাম্বার',
+    'কাঠমিস্ত্রি',
     'AC মেরামত',
+    'রঙ মিস্ত্রি',
+    'দর্জি',
     'গাড়ি মেকানিক',
-    'ছুতার মিস্ত্রি',
-    'রাজমিস্ত্রি',
+  ];
+
+  // Prototype sample incoming job feed
+  final List<Map<String, dynamic>> _feedJobs = [
+    {
+      'id': 101,
+      'isNew': true,
+      'icon': '🔥',
+      'title': 'গ্যাস লাইন মেরামত',
+      'seeker': 'রাফি হাসান',
+      'distance': '১.২ কিমি দূরে',
+      'budget': 800,
+      'desc': 'রান্নাঘরের গ্যাস লাইন থেকে হালকা গন্ধ পাচ্ছি, দ্রুত একজন কারিগর দরকার।',
+      'location': 'পবনা, শহর এলাকা',
+      'status': 'pending',
+    },
+    {
+      'id': 102,
+      'isNew': false,
+      'icon': '🔌',
+      'title': 'সুইচ বোর্ড ঠিক করা',
+      'seeker': 'নাসরিন আক্তার',
+      'distance': '২.৫ কিমি দূরে',
+      'budget': 350,
+      'desc': 'বেডরুমের সুইচ বোর্ড থেকে স্পার্ক হচ্ছে, আজকের মধ্যে দরকার।',
+      'location': 'পবনা, রাধানগর',
+      'status': 'pending',
+    },
+    {
+      'id': 103,
+      'isNew': false,
+      'icon': '🚰',
+      'title': 'পানির পাইপ লিক',
+      'seeker': 'করিম সাহেব',
+      'distance': '৩.১ কিমি দূরে',
+      'budget': 500,
+      'desc': 'রান্নাঘরের নিচে পাইপ থেকে পানি চুইয়ে পড়ছে।',
+      'location': 'পবনা, শালগাড়িয়া',
+      'status': 'pending',
+    },
   ];
 
   @override
@@ -54,7 +86,6 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
   @override
   void dispose() {
     _bioController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -64,7 +95,6 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // 1. Get current provider profile (to read online/offline and category status)
       final profile = await ApiService.getProviderById(auth.currentUser!.id);
       if (profile != null) {
         _isOnline = profile.isOnline;
@@ -74,608 +104,606 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
         _bioController.text = profile.bio;
       }
 
-      // 2. Load Job Requests
       final jobs = await ApiService.getJobsForKarigor(auth.currentUser!.id);
-
-      // 3. Load nearby providers
-      final providers = await ApiService.getProviders();
-
       if (mounted) {
         setState(() {
-          _jobs = jobs;
-          _providers = providers.where((p) => p.id != auth.currentUser!.id).toList(); // Exclude self
+          _backendJobs = jobs;
           _isLoading = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _showErrorSnackBar('লোড করতে ত্রুটি: $e');
-      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _toggleOnlineStatus(bool val) async {
     final auth = context.read<AuthProvider>();
-    if (auth.currentUser == null) return;
+    setState(() => _isOnline = val);
 
-    setState(() {
-      _isOnline = val;
-    });
-
-    try {
-      final success = await ApiService.updateOnlineStatus(auth.currentUser!.id, val);
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(val ? '✅ আপনি এখন অনলাইনে আছেন' : '❌ আপনি এখন অফলাইনে আছেন'),
-            backgroundColor: val ? Colors.green : Colors.grey.shade700,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isOnline = !val); // Revert status
-        _showErrorSnackBar('স্ট্যাটাস পরিবর্তনে ব্যর্থতা: $e');
-      }
+    if (auth.currentUser != null) {
+      try {
+        await ApiService.updateOnlineStatus(auth.currentUser!.id, val);
+      } catch (_) {}
     }
-  }
 
-  Future<void> _updateGPSLocation() async {
-    final auth = context.read<AuthProvider>();
-    if (auth.currentUser == null) return;
-
-    setState(() => _isUpdatingLocation = true);
-
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('জিপিএস লোকেশন সার্ভিসটি বন্ধ রয়েছে। দয়া করে চালু করুন।');
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('লোকেশন পারমিশন প্রত্যাখ্যান করা হয়েছে।');
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception('লোকেশন পারমিশন চিরতরে বন্ধ রয়েছে। সেটিংস থেকে এটি চালু করুন।');
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-
-      final success = await ApiService.updateLocation(
-          auth.currentUser!.id, position.latitude, position.longitude);
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ জিপিএস দিয়ে অবস্থান আপডেট করা হয়েছে! (Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)})'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isUpdatingLocation = false);
-      }
-    }
-  }
-
-  Future<void> _updateJobStatus(int jobId, String status) async {
-    setState(() => _isLoading = true);
-    try {
-      final success = await ApiService.updateJobStatus(jobId, status);
-      if (success) {
-        await _loadProfileAndJobs(); // list refresh
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(status == 'accepted'
-                  ? '✅ কাজ গ্রহণ করা হয়েছে'
-                  : status == 'completed'
-                      ? '✅ কাজ সম্পন্ন করা হয়েছে'
-                      : '❌ কাজ প্রত্যাখ্যান করা হয়েছে'),
-              backgroundColor: status == 'rejected' ? Colors.red : Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _showErrorSnackBar('ত্রুটি: $e');
-      }
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    final auth = context.read<AuthProvider>();
-    if (auth.currentUser == null) return;
-
-    setState(() => _isSavingProfile = true);
-    try {
-      final success = await ApiService.updateProfile(
-        auth.currentUser!.id,
-        category: _selectedCategory,
-        bio: _bioController.text.trim(),
-      );
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ প্রোফাইল সফলভাবে সংরক্ষিত হয়েছে'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar('প্রোফাইল সংরক্ষণ ব্যর্থ: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSavingProfile = false);
-      }
-    }
-  }
-
-  Future<void> _searchProviders(String query) async {
-    if (query.trim().isEmpty) return;
-    setState(() {
-      _isSearching = true;
-      _hasSearched = true;
-    });
-    try {
-      final results = await ApiService.getProviders(category: query.trim());
-      if (mounted) {
-        setState(() {
-          _searchResults = results;
-          _isSearching = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSearching = false);
-        _showErrorSnackBar('অনুসন্ধান ব্যর্থ: $e');
-      }
-    }
-  }
-
-  void _showErrorSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
+          content: Text(val ? 'আপনি এখন অনলাইন 🟢' : 'আপনি এখন অফলাইন'),
+          backgroundColor: val ? AppColors.success : AppColors.ink,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
-  // --- Widgets for tabs ---
+  Future<void> _updateGPSLocation() async {
+    final auth = context.read<AuthProvider>();
+    setState(() => _isUpdatingLocation = true);
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (auth.currentUser != null) {
+        await ApiService.updateLocation(auth.currentUser!.id, position.latitude, position.longitude);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ বর্তমান অবস্থান আপডেট করা হয়েছে!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('লোকেশন আপডেট করতে সমস্যা হয়েছে')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdatingLocation = false);
+    }
+  }
+
+  void _acceptJob(Map<String, dynamic> job) {
+    setState(() {
+      job['status'] = 'accepted';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('অনুরোধ গ্রহণ করা হয়েছে!'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _skipJob(Map<String, dynamic> job) {
+    setState(() {
+      job['status'] = 'skipped';
+    });
+  }
+
+  // ─── TAB 1: JOB FEED ──────────────────────────────────────
 
   Widget _buildHomeTab(AuthProvider auth) {
-    final pending = _jobs.where((j) => j['status'] == 'pending').length;
-    final accepted = _jobs.where((j) => j['status'] == 'accepted').length;
-    final completed = _jobs.where((j) => j['status'] == 'completed').length;
+    final name = auth.currentUser?.name.isNotEmpty == true ? auth.currentUser!.name : 'জসিম উদ্দিন';
+    final initial = name.trim().isNotEmpty ? name.trim().substring(0, 1) : 'জ';
 
     return RefreshIndicator(
+      color: AppColors.terracotta,
       onRefresh: _loadProfileAndJobs,
-      child: CustomScrollView(
-        slivers: [
-          // Online Toggle Box
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Welcome Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'স্বাগতম, $name',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.ink,
+                    fontFamily: 'Baloo Da 2',
+                  ),
+                ),
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.terracottaGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Online / Offline Toggle Row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8),
-                ],
+                color: AppColors.panel,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.line),
+                boxShadow: AppTheme.softShadow,
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isOnline ? Colors.green : Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _isOnline ? 'আপনি এখন অনলাইনে আছেন' : 'আপনি এখন অফলাইনে আছেন',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          _isOnline ? '🟢 আপনি এখন অনলাইন' : '⚪ আপনি এখন অফলাইন',
+                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppColors.ink),
                         ),
+                        const SizedBox(height: 2),
                         Text(
-                          _isOnline ? 'গ্রাহকরা আপনার প্রোফাইল দেখতে পাচ্ছে' : 'প্রোফাইল দেখাতে অনলাইন করুন',
-                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                          _isOnline ? 'নতুন কাজের অনুরোধ পাবেন' : 'অনুরোধ পেতে অনলাইন করুন',
+                          style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
                         ),
                       ],
                     ),
                   ),
                   Switch(
                     value: _isOnline,
-                    activeColor: const Color(0xFFE65100),
+                    activeThumbColor: AppColors.success,
+                    activeTrackColor: AppColors.success.withValues(alpha: 0.3),
+                    inactiveThumbColor: AppColors.offline,
+                    inactiveTrackColor: AppColors.line,
                     onChanged: _toggleOnlineStatus,
                   ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 24),
 
-          // Stats Row
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  _StatCard(label: 'অপেক্ষায়', value: '$pending', icon: Icons.hourglass_empty, color: Colors.orange),
-                  const SizedBox(width: 12),
-                  _StatCard(label: 'চলমান', value: '$accepted', icon: Icons.work, color: Colors.blue),
-                  const SizedBox(width: 12),
-                  _StatCard(label: 'সম্পন্ন', value: '$completed', icon: Icons.check_circle, color: Colors.green),
-                ],
-              ),
+            // Feed Section Title
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'নতুন কাজের অনুরোধ',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.ink,
+                    fontFamily: 'Baloo Da 2',
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.sageBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_feedJobs.where((j) => j['status'] != 'skipped').length}টি',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate),
+                  ),
+                ),
+              ],
             ),
-          ),
+            const SizedBox(height: 12),
 
-          // Other providers list header
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 8),
-              child: Text('অন্যান্য কাছের কারিগরগণ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-          ),
+            // Job Cards Feed
+            ..._feedJobs.map((j) => _buildFeedJobCard(j)),
 
-          if (_providers.isEmpty)
-            const SliverFillRemaining(
-              child: Center(
-                child: Text('কাছে অন্য কোনো কারিগর পাওয়া যায়নি'),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: ProviderCard(
-                      provider: _providers[i],
-                      onTap: () => Navigator.pushNamed(
-                        context,
-                        '/provider-detail',
-                        arguments: _providers[i].id,
+            if (_backendJobs.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('গ্রাহকদের সরাসরি অনুরোধ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 8),
+              ..._backendJobs.map((b) => _buildBackendJobCard(b)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedJobCard(Map<String, dynamic> j) {
+    final isSkipped = j['status'] == 'skipped';
+    final isAccepted = j['status'] == 'accepted';
+
+    return Opacity(
+      opacity: isSkipped ? 0.35 : 1.0,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.panel,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.line),
+          boxShadow: AppTheme.softShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.sageBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(j['icon'] as String, style: const TextStyle(fontSize: 20)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        j['title'] as String,
+                        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppColors.ink),
                       ),
+                      Text(
+                        '${j['seeker']} · ${j['distance']}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.inkSoft),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (j['isNew'] == true)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        margin: const EdgeInsets.only(bottom: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.terracotta,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('নতুন', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                      ),
+                    Text(
+                      '৳ ${j['budget']}',
+                      style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: AppColors.success),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.clayBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                j['desc'] as String,
+                style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, height: 1.4),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 14, color: AppColors.inkSoft),
+                const SizedBox(width: 4),
+                Text(
+                  j['location'] as String,
+                  style: const TextStyle(fontSize: 11, color: AppColors.inkSoft),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (isAccepted)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.sageBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '✓ সাড়া দেওয়া হয়েছে — সিকারের কাছে পাঠানো হচ্ছে',
+                  style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12.5),
+                ),
+              )
+            else if (!isSkipped)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        backgroundColor: AppColors.clayBg,
+                        side: const BorderSide(color: AppColors.line),
+                      ),
+                      onPressed: () => _skipJob(j),
+                      child: const Text('এড়িয়ে যান', style: TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
                     ),
                   ),
-                  childCount: _providers.length,
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        backgroundColor: AppColors.slate,
+                      ),
+                      onPressed: () => _acceptJob(j),
+                      child: const Text('সাড়া দিন', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
-            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBackendJobCard(dynamic b) {
+    final status = b['status']?.toString() ?? 'pending';
+    final desc = b['description']?.toString() ?? '';
+    final seeker = b['seeker_name']?.toString() ?? 'গ্রাহক';
+    final amount = b['amount'] ?? 0;
+    final jobId = b['id'] is int ? b['id'] as int : int.tryParse('${b['id']}') ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(seeker, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const Spacer(),
+              Text('৳ $amount', style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(desc, style: const TextStyle(fontSize: 12)),
+          const SizedBox(height: 10),
+          if (status == 'pending')
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.slate),
+                    onPressed: () async {
+                      await ApiService.updateJobStatus(jobId, 'accepted');
+                      _loadProfileAndJobs();
+                    },
+                    child: const Text('গ্রহণ করুন', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+              ],
+            )
+          else
+            Text('স্ট্যাটাস: $status', style: const TextStyle(fontSize: 11, color: AppColors.inkSoft)),
         ],
       ),
     );
   }
 
-  Widget _buildRequestsTab() {
-    if (_jobs.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadProfileAndJobs,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Container(
-            height: MediaQuery.of(context).size.height * 0.6,
-            alignment: Alignment.center,
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('কোনো কাজের অনুরোধ পাওয়া যায়নি', style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+  // ─── TAB 2: REQUESTS / HISTORY ────────────────────────────
 
-    return RefreshIndicator(
-      onRefresh: _loadProfileAndJobs,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _jobs.length,
-        itemBuilder: (ctx, i) {
-          final job = _jobs[i];
-          final status = job['status']?.toString() ?? 'pending';
-          final jobId = job['id'] is int ? job['id'] as int : int.tryParse('${job['id']}') ?? 0;
-
-          Color statusColor = Colors.orange;
-          String statusLabel = 'অপেক্ষায়';
-
-          if (status == 'accepted') {
-            statusColor = Colors.blue;
-            statusLabel = 'গৃহীত';
-          } else if (status == 'completed') {
-            statusColor = Colors.green;
-            statusLabel = 'সম্পন্ন';
-          } else if (status == 'rejected') {
-            statusColor = Colors.red;
-            statusLabel = 'প্রত্যাখ্যাত';
-          }
-
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.person, size: 18, color: Colors.grey),
-                      const SizedBox(width: 6),
-                      Text(job['seeker_name']?.toString() ?? 'গ্রাহক', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: statusColor),
-                        ),
-                        child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(job['description']?.toString() ?? '', style: const TextStyle(fontSize: 15)),
-                  const SizedBox(height: 8),
-                  if (job['location'] != null && job['location'].toString().isNotEmpty)
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 14, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(job['location'].toString(), style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.phone, size: 14, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text(job['seeker_phone']?.toString() ?? '', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Text(' ৳ ', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
-                      Text('${job['amount'] ?? 0} টাকা', style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  if (status == 'pending') ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                            ),
-                            onPressed: () => _updateJobStatus(jobId, 'rejected'),
-                            child: const Text('প্রত্যাখ্যান'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100)),
-                            onPressed: () => _updateJobStatus(jobId, 'accepted'),
-                            child: const Text('গ্রহণ করুন'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else if (status == 'accepted') ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                        icon: const Icon(Icons.check),
-                        label: const Text('কাজ সম্পন্ন হয়েছে'),
-                        onPressed: () => _updateJobStatus(jobId, 'completed'),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildSearchTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'যেমন: প্লাম্বার, ইলেকট্রিশিয়ান...',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  onSubmitted: _searchProviders,
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                style: IconButton.styleFrom(backgroundColor: const Color(0xFFE65100)),
-                icon: const Icon(Icons.search, color: Colors.white),
-                onPressed: () => _searchProviders(_searchController.text),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _isSearching
-              ? const Center(child: CircularProgressIndicator())
-              : !_hasSearched
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.person_search_rounded, size: 64, color: Colors.grey),
-                          SizedBox(height: 8),
-                          Text('ক্যাটাগরি লিখে অন্যান্য কারিগর খুঁজুন'),
-                        ],
-                      ),
-                    )
-                  : _searchResults.isEmpty
-                      ? const Center(child: Text('কোনো কারিগর পাওয়া যায়নি'))
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _searchResults.length,
-                          itemBuilder: (_, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ProviderCard(
-                              provider: _searchResults[i],
-                              onTap: () => Navigator.pushNamed(
-                                context,
-                                '/provider-detail',
-                                arguments: _searchResults[i].id,
-                              ),
-                            ),
-                          ),
-                        ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfileTab(AuthProvider auth) {
-    final user = auth.currentUser;
+  Widget _buildHistoryTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: CircleAvatar(
-              radius: 44,
-              backgroundColor: const Color(0xFFE65100).withOpacity(0.1),
-              child: const Icon(Icons.person, size: 54, color: Color(0xFFE65100)),
-            ),
+          const Text(
+            'কাজের ইতিহাস ও সম্পন্ন কাজ',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.ink, fontFamily: 'Baloo Da 2'),
           ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              user?.name ?? 'কারিগর',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
+          _buildPastJobCard('গ্যাস ওভেন মেরামত', 'সুমাইয়া রহমান', '৳ ১২০০', 'গতকাল', 'সম্পন্ন'),
+          _buildPastJobCard('সিলিন্ডার লাইন সংযোগ', 'কামরুল ইসলাম', '৳ ৬০০', '৩ দিন আগে', 'সম্পন্ন'),
+          _buildPastJobCard('কিচেন গ্যাস লিক ফিক্স', 'তানভীর আহমেদ', '৳ ৮৫০', '৫ দিন আগে', 'সম্পন্ন'),
+        ],
+      ),
+    );
+  }
 
-          // User details Card
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
+  Widget _buildPastJobCard(String title, String seeker, String amount, String date, String status) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.sageBg,
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: Colors.grey.shade300),
+            ),
+            alignment: Alignment.center,
+            child: const Text('✓', style: TextStyle(fontSize: 20, color: AppColors.success, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.ink)),
+                const SizedBox(height: 2),
+                Text('$seeker · $date', style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft)),
+              ],
+            ),
+          ),
+          Text(amount, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppColors.success)),
+        ],
+      ),
+    );
+  }
+
+  // ─── TAB 3: RATINGS ───────────────────────────────────────
+
+  Widget _buildRatingTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+              boxShadow: AppTheme.softShadow,
             ),
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.phone, color: Color(0xFFE65100)),
-                  title: const Text('মোবাইল নম্বর'),
-                  subtitle: Text(user?.phone ?? 'প্রদান করা হয়নি'),
+                const Text('৪.৮', style: TextStyle(fontSize: 38, fontWeight: FontWeight.bold, color: AppColors.brassDark)),
+                const Text('⭐⭐⭐⭐⭐', style: TextStyle(fontSize: 18)),
+                const SizedBox(height: 6),
+                const Text('মোট ৯০টি রিভিউ এর ভিত্তিতে', style: TextStyle(fontSize: 12, color: AppColors.inkSoft)),
+                const SizedBox(height: 16),
+                const Divider(color: AppColors.line),
+                const SizedBox(height: 12),
+                _buildRatingBar('৫ স্টার', 0.85, '৭৬'),
+                _buildRatingBar('৪ স্টার', 0.12, '১১'),
+                _buildRatingBar('৩ স্টার', 0.03, '৩'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildReviewCard('রাফি হাসান', 'খুব দ্রুত এসে কাজ সমাধান করে দিয়েছেন। ভদ্র ও আন্তরিক।', '৫.০'),
+          _buildReviewCard('নাসরিন আক্তার', 'দক্ষতার সাথে গ্যাস লিকেজ খুঁজে ঠিক করেছেন। ধন্যবাদ!', '৪.৫'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRatingBar(String label, double ratio, String count) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(width: 50, child: Text(label, style: const TextStyle(fontSize: 11.5))),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(value: ratio, color: AppColors.brass, backgroundColor: AppColors.clayBg),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(count, style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewCard(String name, String comment, String rating) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+              Text('⭐ $rating', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.brassDark, fontSize: 12.5)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(comment, style: const TextStyle(fontSize: 12, color: AppColors.inkSoft)),
+        ],
+      ),
+    );
+  }
+
+  // ─── TAB 4: PROFILE ───────────────────────────────────────
+
+  Widget _buildProfileTab(AuthProvider auth) {
+    final user = auth.currentUser;
+    final name = user?.name.isNotEmpty == true ? user!.name : 'জসিম উদ্দিন';
+    final initial = name.trim().isNotEmpty ? name.trim().substring(0, 1) : 'জ';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.terracottaGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.email, color: Color(0xFFE65100)),
-                  title: const Text('ইমেইল এড্রেস'),
-                  subtitle: Text(user?.email ?? 'প্রদান করা হয়নি'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.badge_outlined, color: Color(0xFFE65100)),
-                  title: const Text('রোল / Role'),
-                  subtitle: const Text('কারিগর (Provider)'),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink)),
+                    const SizedBox(height: 2),
+                    const Text('কারিগর (Provider)', style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft)),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // GPS update location button
-          Card(
-            elevation: 0,
-            color: Colors.orange.shade50,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: Colors.orange.shade200),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.gps_fixed, color: Color(0xFFE65100)),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('জিপিএস দিয়ে অবস্থান সেট করুন', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('আপনার অবস্থান গ্রাহকদের সাথে শেয়ার করুন', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100)),
-                    onPressed: _isUpdatingLocation ? null : _updateGPSLocation,
-                    child: _isUpdatingLocation
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('অপ্টিমাইজ GPS'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          const Text('সেবার ধরন (Category)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          // Category setting
+          const Text('আপনার সেবার ধরন', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            value: _categories.contains(_selectedCategory) ? _selectedCategory : _categories.first,
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.work)),
+            value: _selectedCategory,
+            decoration: const InputDecoration(filled: true, fillColor: AppColors.panel),
             items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
             onChanged: (val) {
               if (val != null) setState(() => _selectedCategory = val);
@@ -683,142 +711,144 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          const Text('পরিচিতি / বায়ো (Bio)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          // Bio
+          const Text('অভিজ্ঞতা ও দক্ষতা', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 6),
           TextField(
             controller: _bioController,
-            maxLines: 3,
-            decoration: const InputDecoration(hintText: 'আপনার অভিজ্ঞতা ও দক্ষতা সম্পর্কে লিখুন...'),
-          ),
-          const SizedBox(height: 24),
-
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100)),
-              icon: _isSavingProfile
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.save),
-              label: const Text('প্রোফাইল সংরক্ষণ করুন'),
-              onPressed: _isSavingProfile ? null : _saveProfile,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              filled: true,
+              fillColor: AppColors.panel,
+              hintText: 'আপনার অভিজ্ঞতা সম্পর্কে লিখুন...',
             ),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-              ),
-              icon: const Icon(Icons.logout),
-              label: const Text('লগআউট করুন'),
-              onPressed: () async {
-                await auth.logout();
-                if (mounted) {
-                  Navigator.pushNamedAndRemoveUntil(context, '/role-select', (r) => false);
-                }
-              },
-            ),
+
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.slate),
+            onPressed: _isSavingProfile
+                ? null
+                : () async {
+                    setState(() => _isSavingProfile = true);
+                    if (user != null) {
+                      await ApiService.updateProfile(user.id, category: _selectedCategory, bio: _bioController.text);
+                    }
+                    setState(() => _isSavingProfile = false);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('প্রোফাইল আপডেট হয়েছে!'), backgroundColor: AppColors.success),
+                      );
+                    }
+                  },
+            child: _isSavingProfile
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('সংরক্ষণ করুন'),
           ),
-        ],
-      ),
-    );
-  }
+          const SizedBox(height: 16),
 
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.read<AuthProvider>();
-
-    String title = auth.currentUser?.name ?? 'কারিগর ড্যাশবোর্ড';
-    if (_currentIndex == 1) title = 'কাজের অনুরোধসমূহ';
-    if (_currentIndex == 2) title = 'অন্যান্য কারিগর খুঁজুন';
-    if (_currentIndex == 3) title = 'আমার প্রোফাইল সেটিংস';
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFF8E1),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: const Color(0xFFE65100),
-        title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.gps_fixed),
-            tooltip: 'GPS লোকেশন আপডেট',
+          // GPS update
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.terracotta),
+            icon: _isUpdatingLocation
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.my_location, size: 18),
+            label: const Text('📍 বর্তমান জিপিএস অবস্থান আপডেট করুন'),
             onPressed: _isUpdatingLocation ? null : _updateGPSLocation,
           ),
-          IconButton(
+          const SizedBox(height: 24),
+
+          // Logout
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              side: const BorderSide(color: AppColors.danger),
+              minimumSize: const Size.fromHeight(48),
+            ),
             icon: const Icon(Icons.logout),
-            tooltip: 'লগআউট',
+            label: const Text('লগআউট করুন'),
             onPressed: () async {
               await auth.logout();
-              if (mounted) {
+              if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(context, '/role-select', (r) => false);
               }
             },
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE65100)))
-          : IndexedStack(
-              index: _currentIndex,
-              children: [
-                _buildHomeTab(auth),
-                _buildRequestsTab(),
-                _buildSearchTab(),
-                _buildProfileTab(auth),
-              ],
-            ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFE65100),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          if (index == 0 || index == 1) {
-            _loadProfileAndJobs();
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'হোম'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'অনুরোধ'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'খুঁজুন'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'প্রোফাইল'),
-        ],
-      ),
     );
   }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  const _StatCard({required this.label, required this.value, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6),
-          ],
+    final auth = context.watch<AuthProvider>();
+
+    return Scaffold(
+      backgroundColor: AppColors.clayBg,
+      appBar: _currentIndex == 0
+          ? null
+          : AppBar(
+              backgroundColor: AppColors.panel,
+              automaticallyImplyLeading: false,
+              title: Text(
+                _currentIndex == 1
+                    ? 'কাজের ইতিহাস'
+                    : _currentIndex == 2
+                        ? 'রেটিং ও রিভিউ'
+                        : 'কারিগর প্রোফাইল',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              elevation: 0,
+            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.terracotta))
+          : SafeArea(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: [
+                  _buildHomeTab(auth),
+                  _buildHistoryTab(),
+                  _buildRatingTab(),
+                  _buildProfileTab(auth),
+                ],
+              ),
+            ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.panel,
+          border: Border(top: BorderSide(color: AppColors.line)),
         ),
-        child: Column(
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 6),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          backgroundColor: AppColors.panel,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: AppColors.terracotta,
+          unselectedItemColor: AppColors.inkSoft,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
+          onTap: (i) => setState(() => _currentIndex = i),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'হোম',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_outlined),
+              activeIcon: Icon(Icons.history),
+              label: 'ইতিহাস',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.star_outline),
+              activeIcon: Icon(Icons.star),
+              label: 'রেটিং',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'প্রোফাইল',
+            ),
           ],
         ),
       ),

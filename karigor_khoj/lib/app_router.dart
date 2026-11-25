@@ -7,6 +7,8 @@ import 'screens/auth/forgot_password_screen.dart';
 import 'screens/seeker/seeker_home_screen.dart';
 import 'screens/seeker/search_screen.dart';
 import 'screens/seeker/provider_detail_screen.dart';
+import 'screens/seeker/all_karigors_screen.dart';
+import 'screens/seeker/karigor_ai_chat_screen.dart';
 import 'screens/karigor/karigor_home_screen.dart';
 import 'screens/karigor/karigor_profile_screen.dart';
 
@@ -29,6 +31,11 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const SeekerHomeScreen());
       case '/search':
         return MaterialPageRoute(builder: (_) => const SearchScreen());
+      case '/all-karigors':
+        final cat = settings.arguments as String?;
+        return MaterialPageRoute(builder: (_) => AllKarigorsScreen(initialCategory: cat));
+      case '/ai-chat':
+        return MaterialPageRoute(builder: (_) => const KarigorAiChatScreen());
       case '/provider-detail':
         final providerId = settings.arguments as int? ?? 0;
         return MaterialPageRoute(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/provider_model.dart';
+import '../theme/app_theme.dart';
 
 class ProviderCard extends StatelessWidget {
   final ProviderModel provider;
@@ -11,43 +12,47 @@ class ProviderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: AppColors.panel,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.line),
+          boxShadow: AppTheme.softShadow,
         ),
         child: Row(
           children: [
             // Avatar
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor:
-                      const Color(0xFF1B5E20).withOpacity(0.1),
-                  child: const Icon(Icons.person,
-                      size: 32, color: Color(0xFF1B5E20)),
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.brassGradient,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    provider.initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
                 ),
                 Positioned(
-                  bottom: 0,
-                  right: 0,
+                  bottom: -1,
+                  right: -1,
                   child: Container(
-                    width: 12,
-                    height: 12,
+                    width: 11,
+                    height: 11,
                     decoration: BoxDecoration(
-                      color: provider.isOnline ? Colors.green : Colors.grey,
+                      color: provider.isOnline ? AppColors.success : AppColors.offline,
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: Colors.white, width: 2),
                     ),
                   ),
                 ),
@@ -68,14 +73,14 @@ class ProviderCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 15,
+                            color: AppColors.ink,
                           ),
                         ),
                       ),
                       if (provider.isVerified) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.verified,
-                            size: 16, color: Colors.blue),
+                        const Icon(Icons.verified, size: 16, color: Colors.blue),
                       ],
                     ],
                   ),
@@ -87,27 +92,25 @@ class ProviderCard extends StatelessWidget {
                           provider.category,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              color: Color(0xFF1B5E20),
-                              fontWeight: FontWeight.w500),
+                            color: AppColors.terracotta,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: (provider.isOnline ? Colors.green : Colors.grey).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: (provider.isOnline ? Colors.green : Colors.grey).withOpacity(0.3),
-                            width: 0.5,
-                          ),
+                          color: (provider.isOnline ? AppColors.success : AppColors.offline).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          provider.isOnline ? 'অনলাইন' : 'অফলাইন',
+                          provider.isOnline ? '🟢 অনলাইন' : '⚪ অফলাইন',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: provider.isOnline ? Colors.green.shade800 : Colors.grey.shade700,
+                            color: provider.isOnline ? AppColors.success : AppColors.inkSoft,
                           ),
                         ),
                       ),
@@ -116,27 +119,30 @@ class ProviderCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.star, size: 14, color: Colors.amber),
+                      const Icon(Icons.star, size: 14, color: AppColors.brassDark),
                       const SizedBox(width: 2),
-                      Text('${provider.rating}',
-                          style: const TextStyle(fontSize: 13)),
-                      Text(' (${provider.reviewCount})',
-                          style: const TextStyle(
-                              color: Colors.grey, fontSize: 12)),
+                      Text(
+                        provider.rating.toStringAsFixed(1),
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        ' (${provider.reviewCount})',
+                        style: const TextStyle(color: AppColors.inkSoft, fontSize: 11.5),
+                      ),
                       const Spacer(),
-                      const Icon(Icons.location_on,
-                          size: 14, color: Colors.grey),
-                      Text('${provider.distance} কি.মি.',
-                          style: const TextStyle(
-                              color: Colors.grey, fontSize: 12)),
+                      const Icon(Icons.location_on_outlined, size: 14, color: AppColors.inkSoft),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${provider.distance.toStringAsFixed(1)} কিমি',
+                        style: const TextStyle(color: AppColors.inkSoft, fontSize: 11.5),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward_ios,
-              size: 14, color: Colors.grey),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.inkSoft),
           ],
         ),
       ),

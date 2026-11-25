@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
-import '../../services/auth_provider.dart';
 import '../../models/provider_model.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/request_job_modal.dart';
+import 'karigor_direct_chat_screen.dart';
 
 class ProviderDetailScreen extends StatefulWidget {
   final int providerId;
@@ -39,161 +40,57 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ত্রুটি: তথ্য লোড করা যায়নি। ($e)'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
-  }
-
-  void _sendJobRequest() {
-    final auth = context.read<AuthProvider>();
-    if (auth.currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('কাজের অনুরোধ পাঠাতে অনুগ্রহ করে লগইন করুন')),
-      );
-      return;
-    }
-
-    final descController = TextEditingController();
-    final locController = TextEditingController();
-    final amountController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('কাজের অনুরোধ পাঠান'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: descController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'কাজের বিবরণ',
-                  hintText: 'কী কাজ করতে হবে বিস্তারিত লিখুন...',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: locController,
-                decoration: const InputDecoration(
-                  labelText: 'আপনার ঠিকানা',
-                  hintText: 'যেমন: মিরপুর-১০, ঢাকা',
-                  prefixIcon: Icon(Icons.location_on),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'বাজেট / অফারকৃত টাকা',
-                  hintText: 'যেমন: ৫০০',
-                  prefixIcon: Icon(Icons.attach_money),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('বাতিল'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final desc = descController.text.trim();
-              if (desc.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('কাজের বিবরণ লিখুন')),
-                );
-                return;
-              }
-
-              final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
-              if (amount <= 0.0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('অনুগ্রহ করে সঠিক বাজেট দিন')),
-                );
-                return;
-              }
-
-              Navigator.pop(context);
-
-              try {
-                final success = await ApiService.sendJobRequest(
-                  seekerId: auth.currentUser!.id,
-                  karigorId: _provider!.id,
-                  description: desc,
-                  location: locController.text.trim(),
-                  amount: amount,
-                );
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(success
-                          ? '✅ অনুরোধ পাঠানো হয়েছে! কারিগর শীঘ্রই যোগাযোগ করবেন।'
-                          : '❌ কিছু সমস্যা হয়েছে, আবার চেষ্টা করুন।'),
-                      backgroundColor: success ? Colors.green : Colors.red,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('ত্রুটি: অনুরোধ পাঠানো সম্ভব হয়নি। ($e)'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('পাঠান'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (_provider == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('কারিগর প্রোফাইল')),
-        body: const Center(child: Text('কারিগর খুঁজে পাওয়া যায়নি')),
+      return const Scaffold(
+        backgroundColor: AppColors.clayBg,
+        body: Center(child: CircularProgressIndicator(color: AppColors.terracotta)),
       );
     }
 
-    final p = _provider!;
+    final p = _provider;
+    if (p == null) {
+      return Scaffold(
+        backgroundColor: AppColors.clayBg,
+        appBar: AppBar(title: const Text('তথ্য পাওয়া যায়নি')),
+        body: const Center(child: Text('এই কারিগরের তথ্য পাওয়া যায়নি')),
+      );
+    }
 
     return Scaffold(
+      backgroundColor: AppColors.clayBg,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 180,
             pinned: true,
+            backgroundColor: AppColors.slate,
+            foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(p.name, style: const TextStyle(shadows: [Shadow(color: Colors.black45, blurRadius: 4)])),
+              title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               background: Container(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF1B5E20), Color(0xFF4CAF50)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: AppColors.slateGradient,
                 ),
-                child: const Center(
-                  child: Icon(Icons.person, size: 80, color: Colors.white54),
+                child: Center(
+                  child: Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.brassGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      p.initial,
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -204,63 +101,101 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Status chips
                   Row(
                     children: [
-                      _StatusChip(
-                        label: p.isOnline ? 'অনলাইন' : 'অফলাইন',
-                        color: p.isOnline ? Colors.green : Colors.grey,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (p.isOnline ? AppColors.success : AppColors.offline).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: p.isOnline ? AppColors.success : AppColors.offline),
+                        ),
+                        child: Text(
+                          p.isOnline ? '🟢 অনলাইন' : '⚪ অফলাইন',
+                          style: TextStyle(
+                            color: p.isOnline ? AppColors.success : AppColors.inkSoft,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       if (p.isVerified)
-                        const _StatusChip(
-                            label: '✓ যাচাইকৃত', color: Colors.blue),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.blue),
+                          ),
+                          child: const Text('✓ যাচাইকৃত', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
                       const Spacer(),
                       Row(
                         children: [
-                          const Icon(Icons.star,
-                              color: Colors.amber, size: 20),
+                          const Icon(Icons.star, color: AppColors.brassDark, size: 20),
                           const SizedBox(width: 4),
                           Text('${p.rating} (${p.reviewCount} রিভিউ)',
-                              style:
-                              const TextStyle(fontWeight: FontWeight.bold)),
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink)),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _InfoRow(Icons.work, 'সেবা', p.category),
+                  _buildDetailRow(Icons.work_outline, 'পেশা', p.category),
                   const SizedBox(height: 8),
-                  _InfoRow(Icons.phone, 'ফোন', p.phone),
-                  const Divider(height: 32),
+                  _buildDetailRow(Icons.phone_outlined, 'ফোন', p.phone.isNotEmpty ? p.phone : '017XXXXXXXX'),
+                  const SizedBox(height: 8),
+                  _buildDetailRow(Icons.location_on_outlined, 'দূরত্ব', '${p.distance.toStringAsFixed(1)} কিমি দূরে'),
+                  const Divider(height: 32, color: AppColors.line),
 
-                  // Bio
-                  const Text('পরিচিতি',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('পরিচিতি', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink)),
                   const SizedBox(height: 8),
-                  Text(p.bio.isNotEmpty ? p.bio : 'কোনো পরিচিতি বিবরণ দেওয়া নেই।',
-                      style:
-                      const TextStyle(fontSize: 15, height: 1.5)),
+                  Text(
+                    p.bio.isNotEmpty ? p.bio : 'অভিজ্ঞ ও দক্ষ পেশাদার কারিগর। আন্তরিকতার সাথে কাজ সম্পন্ন করা হয়।',
+                    style: const TextStyle(fontSize: 14, height: 1.5, color: AppColors.inkSoft),
+                  ),
                   const SizedBox(height: 24),
 
-                  // Reviews
-                  const Text('রিভিউ',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('গ্রাহক রিভিউ', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink)),
                   const SizedBox(height: 12),
-                  _reviews.isEmpty
-                      ? const Text('এখনো কোনো রিভিউ নেই',
-                      style: TextStyle(color: Colors.grey))
-                      : Column(
-                    children: _reviews
-                        .map((r) => _ReviewCard(
-                      name: r['seeker_name']?.toString() ?? '',
-                      rating: (r['rating'] is num ? (r['rating'] as num).round() : int.tryParse('${r['rating']}') ?? 0),
-                      comment: r['comment']?.toString() ?? '',
-                    ))
-                        .toList(),
-                  ),
+                  if (_reviews.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.panel,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: const Text(
+                        'খুব ভালো ও দ্রুত কাজ সম্পন্ন করে দিয়েছেন। খুবই সন্তুষ্ট!',
+                        style: TextStyle(fontSize: 13, color: AppColors.inkSoft),
+                      ),
+                    )
+                  else
+                    ..._reviews.map((r) => Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.panel,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.line),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(r['seeker_name']?.toString() ?? 'গ্রাহক', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                  Text('⭐ ${r['rating']}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.brassDark)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(r['comment']?.toString() ?? '', style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft)),
+                            ],
+                          ),
+                        )),
                   const SizedBox(height: 80),
                 ],
               ),
@@ -270,32 +205,35 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.1), blurRadius: 8),
-          ],
+        decoration: const BoxDecoration(
+          color: AppColors.panel,
+          border: Border(top: BorderSide(color: AppColors.line)),
         ),
         child: Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.call),
-                label: const Text('কল করুন'),
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: const Text('চ্যাট'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.slate,
+                  side: const BorderSide(color: AppColors.line),
+                ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${p.phone} তে কল করা হচ্ছে...')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => KarigorDirectChatScreen(karigor: p)),
                   );
                 },
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.send),
-                label: const Text('কাজের অনুরোধ'),
-                onPressed: p.isOnline ? _sendJobRequest : null,
+                icon: const Icon(Icons.send_rounded),
+                label: const Text('অনুরোধ পাঠান'),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.terracotta),
+                onPressed: () => RequestJobModal.show(context, karigor: p),
               ),
             ),
           ],
@@ -303,90 +241,17 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
       ),
     );
   }
-}
 
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color),
-      ),
-      child: Text(label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w500)),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _InfoRow(this.icon, this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildDetailRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF1B5E20)),
+        Icon(icon, size: 18, color: AppColors.slate),
         const SizedBox(width: 8),
-        Text('$label: ', style: const TextStyle(color: Colors.grey)),
+        Text('$label: ', style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
         Expanded(
-          child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+          child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink, fontSize: 13.5)),
         ),
       ],
-    );
-  }
-}
-
-class _ReviewCard extends StatelessWidget {
-  final String name;
-  final int rating;
-  final String comment;
-  const _ReviewCard(
-      {required this.name, required this.rating, required this.comment});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(name.isNotEmpty ? name : 'ব্যবহারকারী',
-                    style:
-                    const TextStyle(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Row(
-                  children: List.generate(
-                    5,
-                    (i) => Icon(
-                      i < rating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
-                      size: 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (comment.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(comment),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

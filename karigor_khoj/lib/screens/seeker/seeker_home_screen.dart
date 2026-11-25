@@ -3,9 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/karigor_repository.dart';
 import '../../models/provider_model.dart';
-import '../../widgets/provider_card.dart';
-import '../../widgets/category_chip.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/request_job_modal.dart';
+import 'all_karigors_screen.dart';
+import 'karigor_ai_chat_screen.dart';
+import 'karigor_direct_chat_screen.dart';
 
 class SeekerHomeScreen extends StatefulWidget {
   const SeekerHomeScreen({super.key});
@@ -16,65 +20,64 @@ class SeekerHomeScreen extends StatefulWidget {
 
 class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
   int _currentIndex = 0;
-  List<ProviderModel> _providers = [];
-  bool _isLoadingProviders = true;
-  String? _selectedCategory;
+  final KarigorRepository _repo = KarigorRepository();
 
-  // Seeker GPS state
+  // Location state
   double? _seekerLat;
   double? _seekerLng;
   bool _isGettingLocation = false;
-  String _locationLabel = 'অবস্থান অজানা';
+  String _locationDisplay = 'অবস্থান খোঁজা হচ্ছে...';
+  String _locationSub = 'এলাকাভিত্তিক কারিগর দেখাতে অবস্থান প্রয়োজন';
 
-  // Search Tab state
-  final _searchController = TextEditingController();
-  List<ProviderModel> _searchResults = [];
-  bool _isSearching = false;
-  bool _hasSearched = false;
-
-  // Requests Tab state
-  List<dynamic> _myRequests = [];
-  bool _isLoadingRequests = true;
-
-  final List<Map<String, dynamic>> _categories = [
-    {'label': 'সব', 'icon': Icons.grid_view},
-    {'label': 'প্লাম্বার', 'icon': Icons.plumbing},
-    {'label': 'ইলেকট্রিশিয়ান', 'icon': Icons.electrical_services},
-    {'label': 'দর্জি', 'icon': Icons.checkroom},
-    {'label': 'রঙ মিস্ত্রি', 'icon': Icons.format_paint},
-    {'label': 'AC মেরামত', 'icon': Icons.ac_unit},
-    {'label': 'গাড়ি মেকানিক', 'icon': Icons.car_repair},
-  ];
+  // Requests state
+  List<dynamic> _backendRequests = [];
+  bool _isLoadingBackendRequests = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _detectLocationThenLoad();
-      _loadMyRequests();
+      _detectLocation();
+      _loadBackendData();
     });
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  Future<void> _loadBackendData() async {
+    final auth = context.read<AuthProvider>();
+    await _repo.fetchFromBackend(lat: _seekerLat, lng: _seekerLng);
+    if (auth.currentUser != null) {
+      setState(() => _isLoadingBackendRequests = true);
+      try {
+        final reqs = await ApiService.getJobsForSeeker(auth.currentUser!.id);
+        if (mounted) {
+          setState(() {
+            _backendRequests = reqs;
+            _isLoadingBackendRequests = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isLoadingBackendRequests = false);
+      }
+    }
   }
 
-  /// Tries to get GPS location first, then loads providers.
-  /// Falls back to loading all providers if permission denied.
-  Future<void> _detectLocationThenLoad() async {
-    setState(() => _isGettingLocation = true);
+  Future<void> _detectLocation() async {
+    setState(() {
+      _isGettingLocation = true;
+      _locationDisplay = 'অবস্থান শনাক্ত করা হচ্ছে...';
+      _locationSub = '';
+    });
+
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
           setState(() {
             _isGettingLocation = false;
-            _locationLabel = 'GPS বন্ধ আছে';
+            _locationDisplay = 'পবনা, বাংলাদেশ (আনুমানিক)';
+            _locationSub = 'জিপিএস বন্ধ — ডিফল্ট এলাকা দেখানো হচ্ছে';
           });
         }
-        await _loadProviders();
         return;
       }
 
@@ -88,10 +91,10 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
         if (mounted) {
           setState(() {
             _isGettingLocation = false;
-            _locationLabel = 'অনুমতি নেই';
+            _locationDisplay = 'পবনা, বাংলাদেশ (আনুমানিক)';
+            _locationSub = 'অনুমতি দেওয়া হয়নি — ডিফল্ট এলাকা দেখানো হচ্ছে';
           });
         }
-        await _loadProviders();
         return;
       }
 
@@ -104,758 +107,1044 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
           _seekerLat = pos.latitude;
           _seekerLng = pos.longitude;
           _isGettingLocation = false;
-          _locationLabel =
-              '${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
+          _locationDisplay = 'শনাক্ত হয়েছে (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
+          _locationSub = 'এখন এই অবস্থানের কাছাকাছি কারিগর দেখানো হচ্ছে';
         });
+        _repo.fetchFromBackend(lat: pos.latitude, lng: pos.longitude);
       }
-
-      await _loadProviders(category: _selectedCategory);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
           _isGettingLocation = false;
-          _locationLabel = 'ত্রুটি';
+          _locationDisplay = 'পবনা, বাংলাদেশ (আনুমানিক)';
+          _locationSub = 'ডিফল্ট এলাকা দেখানো হচ্ছে';
         });
       }
-      await _loadProviders();
     }
   }
 
-  Future<void> _refreshLocation() async {
-    await _detectLocationThenLoad();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _seekerLat != null
-                ? '✅ অবস্থান আপডেট হয়েছে। কাছের ৫ কি.মি. কারিগর দেখাচ্ছে।'
-                : '⚠️ অবস্থান পাওয়া যায়নি। সব কারিগর দেখাচ্ছে।',
-          ),
-          backgroundColor: _seekerLat != null ? Colors.green : Colors.orange,
-        ),
-      );
-    }
+  void _callProvider(ProviderModel p) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${p.name} কে কল করা হচ্ছে...'),
+        backgroundColor: AppColors.slate,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  Future<void> _loadProviders({String? category}) async {
-    setState(() => _isLoadingProviders = true);
-    try {
-      final providers = await ApiService.getProviders(
-        category: category,
-        lat: _seekerLat,
-        lng: _seekerLng,
-        radius: 5.0,
-      );
-      if (mounted) {
-        setState(() {
-          _providers = providers;
-          _isLoadingProviders = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingProviders = false);
-        _showErrorSnackBar('লোড করতে ত্রুটি: $e');
-      }
-    }
-  }
+  // ─── TAB 1: HOME ──────────────────────────────────────────
 
-  Future<void> _loadMyRequests() async {
-    final auth = context.read<AuthProvider>();
-    if (auth.currentUser == null) return;
-    setState(() => _isLoadingRequests = true);
-    try {
-      final requests = await ApiService.getJobsForSeeker(auth.currentUser!.id);
-      if (mounted) {
-        setState(() {
-          _myRequests = requests;
-          _isLoadingRequests = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingRequests = false);
-        _showErrorSnackBar('অনুরোধসমূহ লোড করতে ত্রুটি: $e');
-      }
-    }
-  }
+  Widget _buildHomeTab(AuthProvider auth) {
+    final userName = auth.currentUser?.name.isNotEmpty == true ? auth.currentUser!.name : 'রাফি';
+    final userInit = userName.trim().isNotEmpty ? userName.trim().substring(0, 1) : 'র';
+    final nearby = _repo.allProviders.take(4).toList();
 
-  Future<void> _searchProviders(String query) async {
-    if (query.trim().isEmpty) return;
-    setState(() {
-      _isSearching = true;
-      _hasSearched = true;
-    });
-    try {
-      final results = await ApiService.getProviders(
-        category: query.trim(),
-        lat: _seekerLat,
-        lng: _seekerLng,
-        radius: 20.0, // wider radius for search
-      );
-      if (mounted) {
-        setState(() {
-          _searchResults = results;
-          _isSearching = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSearching = false);
-        _showErrorSnackBar('অনুসন্ধান ব্যর্থ: $e');
-      }
-    }
-  }
-
-  void _showErrorSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  // ─── Complete & Rate job ───────────────────────────────────
-
-  void _completeAndRateJob(int jobId, int providerId) {
-    if (providerId <= 0) {
-      _showErrorSnackBar('ত্রুটি: কারিগরের তথ্য পাওয়া যায়নি');
-      return;
-    }
-
-    final commentController = TextEditingController();
-    int selectedRating = 5;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('কাজ সম্পন্ন ও রেটিং'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+    return RefreshIndicator(
+      color: AppColors.terracotta,
+      onRefresh: _loadBackendData,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Welcome Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                    'কাজটি কি সফলভাবে সম্পন্ন হয়েছে? কারিগরের জন্য একটি রেটিং এবং মন্তব্য দিন।'),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    final ratingVal = index + 1;
-                    return IconButton(
-                      icon: Icon(
-                        ratingVal <= selectedRating
-                            ? Icons.star
-                            : Icons.star_border,
-                        color: Colors.amber,
-                        size: 32,
-                      ),
-                      onPressed: () =>
-                          setDialogState(() => selectedRating = ratingVal),
-                    );
-                  }),
+                Text(
+                  'স্বাগতম, $userName 👋',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.ink,
+                    fontFamily: 'Baloo Da 2',
+                  ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: commentController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'মন্তব্য লিখুন',
-                    hintText: 'যেমন: চমৎকার কাজ করেছেন!',
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.slateLightGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    userInit,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('বাতিল'),
+            const SizedBox(height: 18),
+
+            // AI Banner
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const KarigorAiChatScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2A4740), Color(0xFF1F3832)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppTheme.liftShadow,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text('✨', style: TextStyle(fontSize: 22)),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AI সহকারীকে বলুন আপনার সমস্যা',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Baloo Da 2',
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'বাংলা বা বাংলিশে লিখুন, সরাসরি সমাধান মিলবে',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
+                  ],
+                ),
+              ),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final comment = commentController.text.trim();
-                if (comment.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('একটি মন্তব্য লিখুন')),
-                  );
-                  return;
-                }
-                Navigator.pop(ctx);
-                setState(() => _isLoadingRequests = true);
-                try {
-                  final auth = context.read<AuthProvider>();
-                  await ApiService.updateJobStatus(jobId, 'completed');
-                  await ApiService.addReview(
-                      providerId, auth.currentUser!.id, selectedRating, comment);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            '✅ কাজ সম্পন্ন হয়েছে এবং রেটিং সফলভাবে জমা হয়েছে!'),
-                        backgroundColor: Colors.green,
+            const SizedBox(height: 24),
+
+            // Service Categories Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'সেবার ধরন',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.ink,
+                    fontFamily: 'Baloo Da 2',
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AllKarigorsScreen(title: 'সকল ধরনের কারিগর'),
                       ),
                     );
-                    _loadMyRequests();
-                    _loadProviders(category: _selectedCategory);
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    setState(() => _isLoadingRequests = false);
-                    _showErrorSnackBar('ত্রুটি: $e');
-                  }
-                }
-              },
-              child: const Text('সম্পন্ন করুন'),
+                  },
+                  child: const Text(
+                    'সব দেখুন',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.terracotta,
+                    ),
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 12),
+
+            // Category Grid (4 items)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildCategoryItem('🔌', 'ইলেকট্রিশিয়ান', 'ইলেকট্রিক'),
+                _buildCategoryItem('🔥', 'গ্যাস লাইন', 'গ্যাস'),
+                _buildCategoryItem('🚰', 'প্লাম্বার', 'প্লাম্ব'),
+                _buildCategoryItem('🪚', 'কাঠমিস্ত্রি', 'কাঠ'),
+              ],
+            ),
+            const SizedBox(height: 26),
+
+            // Nearby Karigors Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'আপনার কাছের কারিগর',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.ink,
+                    fontFamily: 'Baloo Da 2',
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AllKarigorsScreen(title: 'আশেপাশের সকল কারিগর'),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'সব দেখুন',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.terracotta,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Nearby Karigors List
+            ...nearby.map((k) => _buildKarigorCard(k)),
           ],
         ),
       ),
     );
   }
 
-  // ─── TAB WIDGETS ──────────────────────────────────────────
-
-  Widget _buildHomeTab(AuthProvider auth) {
-    return RefreshIndicator(
-      onRefresh: () => _loadProviders(category: _selectedCategory),
-      child: CustomScrollView(
-        slivers: [
-          // Location Status Banner
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _seekerLat != null
-                    ? Colors.green.shade50
-                    : Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: _seekerLat != null
-                      ? Colors.green.shade200
-                      : Colors.orange.shade200,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _seekerLat != null ? Icons.location_on : Icons.location_off,
-                    color: _seekerLat != null ? Colors.green : Colors.orange,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _isGettingLocation
-                        ? const Text('অবস্থান খোঁজা হচ্ছে...',
-                            style: TextStyle(fontSize: 13))
-                        : Text(
-                            _seekerLat != null
-                                ? 'আপনার কাছের ৫ কি.মি. কারিগর দেখাচ্ছে'
-                                : 'GPS চালু করুন — কাছের কারিগর দেখতে',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                  ),
-                  if (_isGettingLocation)
-                    const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                ],
-              ),
+  Widget _buildCategoryItem(String icon, String label, String catKey) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AllKarigorsScreen(
+              initialCategory: catKey,
+              title: '$label কারিগর',
             ),
           ),
-
-          // Categories
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('সেবার ধরন',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 44,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) {
-                        final cat = _categories[i];
-                        final label = cat['label'] as String;
-                        final isSelected =
-                            (i == 0 && _selectedCategory == null) ||
-                                _selectedCategory == label;
-                        return CategoryChip(
-                          label: label,
-                          icon: cat['icon'] as IconData,
-                          isSelected: isSelected,
-                          onTap: () {
-                            setState(() {
-                              _selectedCategory = i == 0 ? null : label;
-                            });
-                            _loadProviders(category: i == 0 ? null : label);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+              boxShadow: AppTheme.softShadow,
+            ),
+            alignment: Alignment.center,
+            child: Text(icon, style: const TextStyle(fontSize: 24)),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppColors.inkSoft,
             ),
           ),
-
-          // Header
-          SliverToBoxAdapter(
-            child: Padding(
-              padding:
-                  const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _seekerLat != null
-                        ? 'কাছের কারিগর (অনলাইন প্রথমে)'
-                        : 'সকল কারিগর',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  if (_isLoadingProviders)
-                    const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2)),
-                ],
-              ),
-            ),
-          ),
-
-          // Provider list
-          if (_isLoadingProviders)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_providers.isEmpty)
-            SliverFillRemaining(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.person_search_rounded,
-                          size: 72, color: Colors.grey),
-                      const SizedBox(height: 12),
-                      Text(
-                        _seekerLat != null
-                            ? '৫ কি.মি. এর মধ্যে কোনো কারিগর পাওয়া যায়নি।\nত্রিজ্যা বাড়াতে ক্যাটাগরি পরিবর্তন করুন।'
-                            : 'কোনো কারিগর পাওয়া যায়নি।',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('আবার চেষ্টা করুন'),
-                        onPressed: () =>
-                            _loadProviders(category: _selectedCategory),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: ProviderCard(
-                      provider: _providers[i],
-                      onTap: () => Navigator.pushNamed(
-                        context,
-                        '/provider-detail',
-                        arguments: _providers[i].id,
-                      ).then((_) => _loadMyRequests()),
-                    ),
-                  ),
-                  childCount: _providers.length,
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildSearchTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+  Widget _buildKarigorCard(ProviderModel k) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'যেমন: প্লাম্বার, ইলেকট্রিশিয়ান...',
-                    prefixIcon: Icon(Icons.search),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: AppColors.brassGradient,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  k.initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
                   ),
-                  onSubmitted: _searchProviders,
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B5E20)),
-                icon: const Icon(Icons.search, color: Colors.white),
-                onPressed: () => _searchProviders(_searchController.text),
+              Positioned(
+                bottom: -2,
+                right: -2,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: k.isOnline ? AppColors.success : AppColors.offline,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
               ),
             ],
           ),
-        ),
-        Expanded(
-          child: _isSearching
-              ? const Center(child: CircularProgressIndicator())
-              : !_hasSearched
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.person_search_rounded,
-                              size: 64, color: Colors.grey),
-                          SizedBox(height: 8),
-                          Text('পেশা বা ক্যাটাগরি লিখে কারিগর খুঁজুন'),
-                        ],
-                      ),
-                    )
-                  : _searchResults.isEmpty
-                      ? const Center(
-                          child: Text('কোনো কারিগর পাওয়া যায়নি'))
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _searchResults.length,
-                          itemBuilder: (_, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ProviderCard(
-                              provider: _searchResults[i],
-                              onTap: () => Navigator.pushNamed(
-                                context,
-                                '/provider-detail',
-                                arguments: _searchResults[i].id,
-                              ).then((_) => _loadMyRequests()),
-                            ),
-                          ),
-                        ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRequestsTab() {
-    if (_isLoadingRequests) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_myRequests.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadMyRequests,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: 400,
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.receipt_long, size: 64, color: Colors.grey),
-                  SizedBox(height: 12),
-                  Text('আপনি এখনো কোনো কাজের অনুরোধ পাঠাননি'),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadMyRequests,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _myRequests.length,
-        itemBuilder: (ctx, index) {
-          final req = _myRequests[index];
-          final status = req['status']?.toString() ?? 'pending';
-          final jobId = req['id'] is int ? req['id'] as int : int.tryParse('${req['id']}') ?? 0;
-          final karigorId = req['karigor_id'] is int ? req['karigor_id'] as int : int.tryParse('${req['karigor_id']}') ?? 0;
-
-          Color statusColor = Colors.orange;
-          String statusText = 'অপেক্ষমান';
-
-          if (status == 'accepted') {
-            statusColor = Colors.blue;
-            statusText = 'চলমান';
-          } else if (status == 'completed') {
-            statusColor = Colors.green;
-            statusText = 'সম্পন্ন';
-          } else if (status == 'rejected') {
-            statusColor = Colors.red;
-            statusText = 'প্রত্যাখ্যাত';
-          }
-
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        req['karigor_name']?.toString() ?? 'কারিগর',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: statusColor),
-                        ),
-                        child: Text(statusText,
-                            style: TextStyle(
-                                color: statusColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  k.name,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.ink,
                   ),
-                  const SizedBox(height: 8),
-                  Text(req['description']?.toString() ?? '',
-                      style: const TextStyle(fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on,
-                          size: 14, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(req['location']?.toString() ?? 'ঠিকানা দেওয়া হয়নি',
-                            style: const TextStyle(
-                                color: Colors.grey, fontSize: 12)),
-                      ),
-                    ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  k.category,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.terracotta,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Text(' ৳ ',
-                          style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold)),
-                      Text('${req['amount'] ?? 0} টাকা',
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  if (status == 'accepted') ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: const Text('কাজটি সম্পন্ন হয়েছে'),
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green),
-                        onPressed: () => _completeAndRateJob(jobId, karigorId),
-                      ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(
+                      k.isOnline ? '🟢 অনলাইন' : '⚪ অফলাইন',
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '📍 ${k.distance.toStringAsFixed(1)} কিমি',
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '⭐ ${k.rating.toStringAsFixed(1)}',
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
                     ),
                   ],
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildProfileTab(AuthProvider auth) {
-    final user = auth.currentUser;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          const CircleAvatar(
-            radius: 50,
-            backgroundColor: Color(0xFF1B5E20),
-            child: Icon(Icons.person, size: 64, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            user?.name ?? 'সেবা গ্রহণকারী',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Column(
-              children: [
-                ListTile(
-                  leading:
-                      const Icon(Icons.phone, color: Color(0xFF1B5E20)),
-                  title: const Text('মোবাইল নম্বর'),
-                  subtitle: Text(user?.phone ?? 'প্রদান করা হয়নি'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading:
-                      const Icon(Icons.email, color: Color(0xFF1B5E20)),
-                  title: const Text('ইমেইল এড্রেস'),
-                  subtitle: Text(user?.email ?? 'প্রদান করা হয়নি'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.badge_outlined,
-                      color: Color(0xFF1B5E20)),
-                  title: const Text('রোল / Role'),
-                  subtitle: const Text('সেবা গ্রহণকারী (Seeker)'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.location_on,
-                      color: Color(0xFF1B5E20)),
-                  title: const Text('বর্তমান অবস্থান'),
-                  subtitle: Text(_locationLabel),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-              minimumSize: const Size.fromHeight(50),
-            ),
-            icon: const Icon(Icons.logout),
-            label: const Text('লগআউট করুন'),
-            onPressed: () async {
-              await auth.logout();
-              if (mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                    context, '/role-select', (r) => false);
-              }
-            },
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSmallBtn('📞 কল', AppColors.clayBg, AppColors.slate, () => _callProvider(k)),
+              const SizedBox(height: 6),
+              _buildSmallBtn('💬 চ্যাট', AppColors.sageBg, AppColors.slate, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => KarigorDirectChatScreen(karigor: k)),
+                );
+              }),
+              const SizedBox(height: 6),
+              _buildSmallBtn('অনুরোধ', AppColors.terracotta, Colors.white, () {
+                RequestJobModal.show(context, karigor: k);
+              }),
+            ],
           ),
-          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  // ─── BUILD ────────────────────────────────────────────────
+  Widget _buildSmallBtn(String label, Color bg, Color textColor, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.read<AuthProvider>();
+  // ─── TAB 2: REQUESTS ──────────────────────────────────────
 
-    String title = auth.currentUser?.name ?? 'কারিগর খোঁজ';
-    if (_currentIndex == 1) title = 'কারিগর খুঁজুন';
-    if (_currentIndex == 2) title = 'আমার অনুরোধ সমূহ';
-    if (_currentIndex == 3) title = 'আমার প্রোফাইল';
+  Widget _buildRequestsTab() {
+    final sent = _repo.sentRequests;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F8E9),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(title,
-            style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        actions: [
-          // GPS button — only show on home tab
-          if (_currentIndex == 0)
-            _isGettingLocation
-                ? const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2)),
-                  )
-                : IconButton(
-                    icon: Icon(
-                      _seekerLat != null
-                          ? Icons.gps_fixed
-                          : Icons.gps_not_fixed,
-                      color: _seekerLat != null ? Colors.white : Colors.white70,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'সক্রিয় অনুরোধ',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.ink,
+              fontFamily: 'Baloo Da 2',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          if (_isLoadingBackendRequests)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.terracotta),
+                ),
+              ),
+            ),
+
+          if (sent.isEmpty && _backendRequests.isEmpty && !_isLoadingBackendRequests)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 36),
+              alignment: Alignment.center,
+              child: const Text(
+                'এখনো কোনো সক্রিয় অনুরোধ নেই। AI চ্যাট বা কারিগর তালিকা থেকে অনুরোধ পাঠান।',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppColors.inkSoft),
+              ),
+            )
+          else ...[
+            ...sent.map((r) => _buildSentRequestCard(r)),
+            ..._backendRequests.map((b) => _buildBackendJobCard(b)),
+          ],
+
+          const SizedBox(height: 24),
+          const Text(
+            'সম্পন্ন হয়েছে',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.ink,
+              fontFamily: 'Baloo Da 2',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Static/Past completed example
+          Opacity(
+            opacity: 0.75,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.panel,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.line),
+                boxShadow: AppTheme.softShadow,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.sageBg,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    tooltip: 'আমার অবস্থান থেকে কাছের কারিগর খুঁজুন',
-                    onPressed: _refreshLocation,
+                    alignment: Alignment.center,
+                    child: const Text('🚰', style: TextStyle(fontSize: 20)),
                   ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'লগআউট',
-            onPressed: () async {
-              await auth.logout();
-              if (mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                    context, '/role-select', (r) => false);
-              }
-            },
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'বাথরুম কল মেরামত',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.ink),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          '২ দিন আগে · রহিম মিয়া',
+                          style: TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Text(
+                    '৳ ৪৫০',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
+    );
+  }
+
+  Widget _buildSentRequestCard(SentJobRequest r) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHomeTab(auth),
-          _buildSearchTab(),
-          _buildRequestsTab(),
-          _buildProfileTab(auth),
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.sageBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: const Text('📋', style: TextStyle(fontSize: 18)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r.karigor?.name ?? 'সাধারণ অনুরোধ',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.ink),
+                    ),
+                    Text(
+                      'পোস্ট করা হয়েছে ${r.timeAgo}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '৳ ${r.amount.toInt()}',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.success),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.clayBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              r.description,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, size: 14, color: AppColors.inkSoft),
+              const SizedBox(width: 4),
+              Text(
+                r.location,
+                style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (r.karigor != null)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.sageBg,
+                      foregroundColor: AppColors.slate,
+                      elevation: 0,
+                      side: const BorderSide(color: AppColors.line),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text('চ্যাট করুন', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => KarigorDirectChatScreen(karigor: r.karigor!),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              if (r.karigor != null) const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.danger,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: const Text('ডিলিট করুন', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    _repo.deleteRequest(r.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('অনুরোধটি ডিলিট করা হয়েছে')),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF1B5E20),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-          if (index == 2) _loadMyRequests();
-          if (index == 0) _loadProviders(category: _selectedCategory);
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'হোম'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.search), label: 'খুঁজুন'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long), label: 'অনুরোধ'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person), label: 'প্রোফাইল'),
+    );
+  }
+
+  Widget _buildBackendJobCard(dynamic job) {
+    final status = job['status']?.toString() ?? 'pending';
+    final desc = job['description']?.toString() ?? '';
+    final name = job['karigor_name']?.toString() ?? 'কারিগর';
+    final amount = job['amount'] ?? 0;
+    final location = job['location']?.toString() ?? 'পবনা';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (status == 'accepted' ? Colors.blue : Colors.orange).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  status == 'accepted' ? 'গৃহীত' : 'অপেক্ষমান',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: status == 'accepted' ? Colors.blue : Colors.orange,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(desc, style: const TextStyle(fontSize: 12.5)),
+          const SizedBox(height: 6),
+          Text('📍 $location · ৳ $amount', style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft)),
         ],
       ),
+    );
+  }
+
+  // ─── TAB 3: PROFILE ───────────────────────────────────────
+
+  Widget _buildProfileTab(AuthProvider auth) {
+    final user = auth.currentUser;
+    final name = user?.name.isNotEmpty == true ? user!.name : 'রাফি হাসান';
+    final initial = name.trim().isNotEmpty ? name.trim().substring(0, 1) : 'র';
+    final activeChats = _repo.directChats;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // User Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.slateLightGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'সেবা গ্রহণকারী',
+                      style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Location Section
+          const Text(
+            'অবস্থান',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink, fontFamily: 'Baloo Da 2'),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppColors.sageBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text('📍', style: TextStyle(fontSize: 18)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _locationDisplay,
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.ink),
+                          ),
+                          if (_locationSub.isNotEmpty)
+                            Text(
+                              _locationSub,
+                              style: const TextStyle(fontSize: 11, color: AppColors.inkSoft),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.slate,
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  icon: _isGettingLocation
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.my_location, size: 18),
+                  label: const Text('📍 বর্তমান অবস্থান শনাক্ত করুন'),
+                  onPressed: _isGettingLocation ? null : _detectLocation,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Direct Chats Section
+          const Text(
+            'আমার চ্যাটসমূহ',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink, fontFamily: 'Baloo Da 2'),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: activeChats.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'এখনো কোনো কারিগরের সাথে চ্যাট শুরু হয়নি। কারিগর তালিকা বা AI চ্যাট থেকে "চ্যাট" বাটনে ক্লিক করুন।',
+                      style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft),
+                    ),
+                  )
+                : Column(
+                    children: activeChats.entries.map((entry) {
+                      final karigor = _repo.allProviders.firstWhere(
+                        (k) => k.id == entry.key,
+                        orElse: () => ProviderModel(
+                          id: entry.key,
+                          name: 'কারিগর #${entry.key}',
+                          category: 'সেবা',
+                          rating: 4.8,
+                          reviewCount: 10,
+                          isOnline: true,
+                          isVerified: true,
+                          phone: '',
+                          bio: '',
+                          distance: 1.5,
+                        ),
+                      );
+                      final lastMsg = entry.value.isNotEmpty ? entry.value.last.text : '';
+
+                      return ListTile(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => KarigorDirectChatScreen(karigor: karigor)),
+                          );
+                        },
+                        leading: Stack(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                gradient: AppColors.brassGradient,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                karigor.initial,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: karigor.isOnline ? AppColors.success : AppColors.offline,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        title: Text(karigor.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        subtitle: Text(lastMsg, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5)),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.inkSoft),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          const SizedBox(height: 24),
+
+          // Account Options
+          const Text(
+            'অ্যাকাউন্ট',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink, fontFamily: 'Baloo Da 2'),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: Column(
+              children: [
+                _buildSettingsRow('⚙️', 'সেটিংস'),
+                const Divider(height: 1, color: AppColors.line),
+                _buildSettingsRow('🛎️', 'নোটিফিকেশন'),
+                const Divider(height: 1, color: AppColors.line),
+                _buildSettingsRow('❓', 'সাহায্য'),
+                const Divider(height: 1, color: AppColors.line),
+                ListTile(
+                  leading: const Text('🚪', style: TextStyle(fontSize: 18)),
+                  title: const Text('লগআউট', style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  onTap: () async {
+                    await auth.logout();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(context, '/role-select', (r) => false);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsRow(String icon, String label) {
+    return ListTile(
+      leading: Text(icon, style: const TextStyle(fontSize: 18)),
+      title: Text(label, style: const TextStyle(fontSize: 13.5, color: AppColors.ink)),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.inkSoft),
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$label শীঘ্রই আসছে')),
+        );
+      },
+    );
+  }
+
+  // ─── MAIN BUILD ───────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    return ListenableBuilder(
+      listenable: _repo,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.clayBg,
+          appBar: _currentIndex == 0
+              ? null
+              : AppBar(
+                  backgroundColor: AppColors.panel,
+                  automaticallyImplyLeading: false,
+                  title: Text(
+                    _currentIndex == 2 ? 'আমার অনুরোধসমূহ' : 'প্রোফাইল',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  elevation: 0,
+                ),
+          body: SafeArea(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: [
+                _buildHomeTab(auth),
+                const SizedBox(), // Placeholder for index 1 (AI Chat opens as screen or tab)
+                _buildRequestsTab(),
+                _buildProfileTab(auth),
+              ],
+            ),
+          ),
+          bottomNavigationBar: Container(
+            decoration: const BoxDecoration(
+              color: AppColors.panel,
+              border: Border(top: BorderSide(color: AppColors.line)),
+            ),
+            child: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              backgroundColor: AppColors.panel,
+              elevation: 0,
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: AppColors.terracotta,
+              unselectedItemColor: AppColors.inkSoft,
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
+              onTap: (i) {
+                if (i == 1) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const KarigorAiChatScreen()),
+                  );
+                } else {
+                  setState(() => _currentIndex = i);
+                }
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home),
+                  label: 'হোম',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.auto_awesome_outlined),
+                  activeIcon: Icon(Icons.auto_awesome),
+                  label: 'AI চ্যাট',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.receipt_long_outlined),
+                  activeIcon: Icon(Icons.receipt_long),
+                  label: 'অনুরোধ',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_outline),
+                  activeIcon: Icon(Icons.person),
+                  label: 'প্রোফাইল',
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -69,12 +70,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF1B5E20);
+    const primaryColor = AppColors.slate;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBE7),
+      backgroundColor: AppColors.clayBg,
       appBar: AppBar(
         backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
         title: const Text('পাসওয়ার্ড ভুলে গেছেন?'),
       ),
       body: SingleChildScrollView(

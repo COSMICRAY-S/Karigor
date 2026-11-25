@@ -49,4 +49,21 @@ class ProviderModel {
           : null,
     );
   }
+
+  String get initial {
+    if (name.trim().isEmpty) return 'ক';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    for (final p in parts) {
+      if (p.startsWith('মোঃ') || p.startsWith('মো:')) continue;
+      if (p.isNotEmpty) {
+        return p.substring(0, 1);
+      }
+    }
+    return name.trim().substring(0, 1);
+  }
+
+  String get displayTag {
+    if (category.isNotEmpty) return category;
+    return 'দক্ষ কারিগর';
+  }
 }

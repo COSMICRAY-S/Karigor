@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
+import '../../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   final String role;
@@ -51,13 +52,13 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isKarigor = widget.role == 'karigor';
-    final primaryColor =
-        isKarigor ? const Color(0xFFE65100) : const Color(0xFF1B5E20);
+    final primaryColor = isKarigor ? AppColors.terracotta : AppColors.slate;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBE7),
+      backgroundColor: AppColors.clayBg,
       appBar: AppBar(
         backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
         title: Text(isKarigor ? 'কারিগর লগইন' : 'সেবা গ্রহণকারী লগইন'),
       ),
       body: SingleChildScrollView(
@@ -124,7 +125,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
               child: Text(
                 'পাসওয়ার্ড ভুলে গেছেন?',
-                style: TextStyle(color: primaryColor.withOpacity(0.8), fontSize: 13),
+                style: TextStyle(color: primaryColor.withValues(alpha: 0.8), fontSize: 13),
               ),
             ),
             const SizedBox(height: 4),
