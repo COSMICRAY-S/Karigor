@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/provider_model.dart';
+import '../services/language_provider.dart';
 import '../theme/app_theme.dart';
 
 class ProviderCard extends StatelessWidget {
@@ -10,6 +12,8 @@ class ProviderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -89,7 +93,7 @@ class ProviderCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          provider.category,
+                          lang.trCategory(provider.category),
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: AppColors.terracotta,
@@ -106,7 +110,7 @@ class ProviderCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          provider.isOnline ? '🟢 অনলাইন' : '⚪ অফলাইন',
+                          provider.isOnline ? '🟢 ${lang.t('online')}' : '⚪ ${lang.t('offline')}',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -133,7 +137,7 @@ class ProviderCard extends StatelessWidget {
                       const Icon(Icons.location_on_outlined, size: 14, color: AppColors.inkSoft),
                       const SizedBox(width: 2),
                       Text(
-                        '${provider.distance.toStringAsFixed(1)} কিমি',
+                        '${provider.distance.toStringAsFixed(1)} ${lang.t('km_away')}',
                         style: const TextStyle(color: AppColors.inkSoft, fontSize: 11.5),
                       ),
                     ],

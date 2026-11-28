@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
+import '../../services/language_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/language_switch_button.dart';
 
 class LoginScreen extends StatefulWidget {
   final String role;
@@ -24,9 +26,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    final lang = context.read<LanguageProvider>();
     if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ফোন নম্বর ও পাসওয়ার্ড দিন')),
+        SnackBar(content: Text(lang.t('enter_credentials_msg'))),
       );
       return;
     }
@@ -51,44 +54,76 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
     final isKarigor = widget.role == 'karigor';
     final primaryColor = isKarigor ? AppColors.terracotta : AppColors.slate;
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       backgroundColor: AppColors.clayBg,
       appBar: AppBar(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
-        title: Text(isKarigor ? 'কারিগর লগইন' : 'সেবা গ্রহণকারী লগইন'),
+        leadingWidth: canPop ? 134 : 96,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (canPop)
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+              if (canPop) const SizedBox(width: 4),
+              const LanguageSwitchButton(isDark: true),
+            ],
+          ),
+        ),
+        title: Text(
+          isKarigor ? lang.t('karigor_login_title') : lang.t('seeker_login_title'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, size: 20),
+            tooltip: lang.t('settings'),
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             Icon(
               isKarigor ? Icons.construction_rounded : Icons.person_search_rounded,
-              size: 72,
+              size: 68,
               color: primaryColor,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Text(
-              isKarigor ? 'কারিগর হিসেবে লগইন' : 'সেবা গ্রহণকারী হিসেবে লগইন',
+              isKarigor
+                  ? lang.t('karigor_login_heading')
+                  : lang.t('seeker_login_heading'),
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 21,
                   fontWeight: FontWeight.bold,
                   color: primaryColor),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 36),
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'মোবাইল নম্বর',
-                prefixIcon: Icon(Icons.phone),
-                hintText: '01XXXXXXXXX',
+              decoration: InputDecoration(
+                labelText: lang.t('phone_label'),
+                prefixIcon: const Icon(Icons.phone),
+                hintText: lang.t('phone_hint'),
               ),
             ),
             const SizedBox(height: 16),
@@ -96,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: _passwordController,
               obscureText: _obscurePassword,
               decoration: InputDecoration(
-                labelText: 'পাসওয়ার্ড',
+                labelText: lang.t('password_label'),
                 prefixIcon: const Icon(Icons.lock),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -106,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 30),
             Consumer<AuthProvider>(
               builder: (_, auth, __) {
                 return ElevatedButton(
@@ -115,8 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: auth.isLoading ? null : _login,
                   child: auth.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('লগইন করুন',
-                          style: TextStyle(fontSize: 16)),
+                      : Text(lang.t('login_btn'),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 );
               },
             ),
@@ -124,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
             TextButton(
               onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
               child: Text(
-                'পাসওয়ার্ড ভুলে গেছেন?',
+                lang.t('forgot_password_btn'),
                 style: TextStyle(color: primaryColor.withValues(alpha: 0.8), fontSize: 13),
               ),
             ),
@@ -134,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   context, '/register',
                   arguments: widget.role),
               child: Text(
-                'নতুন? এখানে নিবন্ধন করুন',
+                lang.t('register_prompt'),
                 style: TextStyle(color: primaryColor),
               ),
             ),

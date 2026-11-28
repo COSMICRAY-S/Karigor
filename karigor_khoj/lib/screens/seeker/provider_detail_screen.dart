@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
+import '../../services/language_provider.dart';
 import '../../models/provider_model.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/request_job_modal.dart';
@@ -62,6 +64,8 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
       );
     }
 
+    final lang = context.watch<LanguageProvider>();
+
     return Scaffold(
       backgroundColor: AppColors.clayBg,
       body: CustomScrollView(
@@ -111,7 +115,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                           border: Border.all(color: p.isOnline ? AppColors.success : AppColors.offline),
                         ),
                         child: Text(
-                          p.isOnline ? '🟢 অনলাইন' : '⚪ অফলাইন',
+                          p.isOnline ? '🟢 ${lang.t('online')}' : '⚪ ${lang.t('offline')}',
                           style: TextStyle(
                             color: p.isOnline ? AppColors.success : AppColors.inkSoft,
                             fontWeight: FontWeight.bold,
@@ -128,31 +132,31 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.blue),
                           ),
-                          child: const Text('✓ যাচাইকৃত', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
+                          child: Text('✓ ${lang.t('verified')}', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       const Spacer(),
                       Row(
                         children: [
                           const Icon(Icons.star, color: AppColors.brassDark, size: 20),
                           const SizedBox(width: 4),
-                          Text('${p.rating} (${p.reviewCount} রিভিউ)',
+                          Text('${p.rating} (${p.reviewCount} ${lang.t('reviews')})',
                               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink)),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildDetailRow(Icons.work_outline, 'পেশা', p.category),
+                  _buildDetailRow(Icons.work_outline, lang.isEnglish ? 'Category' : 'পেশা', lang.trCategory(p.category)),
                   const SizedBox(height: 8),
-                  _buildDetailRow(Icons.phone_outlined, 'ফোন', p.phone.isNotEmpty ? p.phone : '017XXXXXXXX'),
+                  _buildDetailRow(Icons.phone_outlined, lang.isEnglish ? 'Phone' : 'ফোন', p.phone.isNotEmpty ? p.phone : '017XXXXXXXX'),
                   const SizedBox(height: 8),
-                  _buildDetailRow(Icons.location_on_outlined, 'দূরত্ব', '${p.distance.toStringAsFixed(1)} কিমি দূরে'),
+                  _buildDetailRow(Icons.location_on_outlined, lang.isEnglish ? 'Distance' : 'দূরত্ব', '${p.distance.toStringAsFixed(1)} ${lang.t('km_away')}'),
                   const Divider(height: 32, color: AppColors.line),
 
-                  const Text('পরিচিতি', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink)),
+                  Text(lang.isEnglish ? 'About' : 'পরিচিতি', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink)),
                   const SizedBox(height: 8),
                   Text(
-                    p.bio.isNotEmpty ? p.bio : 'অভিজ্ঞ ও দক্ষ পেশাদার কারিগর। আন্তরিকতার সাথে কাজ সম্পন্ন করা হয়।',
+                    p.bio.isNotEmpty ? p.bio : (lang.isEnglish ? 'Experienced and verified professional artisan.' : 'অভিজ্ঞ ও দক্ষ পেশাদার কারিগর। আন্তরিকতার সাথে কাজ সম্পন্ন করা হয়।'),
                     style: const TextStyle(fontSize: 14, height: 1.5, color: AppColors.inkSoft),
                   ),
                   const SizedBox(height: 24),
@@ -214,7 +218,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
             Expanded(
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('চ্যাট'),
+                label: Text(lang.t('message')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.slate,
                   side: const BorderSide(color: AppColors.line),
@@ -231,7 +235,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
             Expanded(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.send_rounded),
-                label: const Text('অনুরোধ পাঠান'),
+                label: Text(lang.t('request_service_btn')),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.terracotta),
                 onPressed: () => RequestJobModal.show(context, karigor: p),
               ),

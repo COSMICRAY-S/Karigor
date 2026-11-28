@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/language_provider.dart';
+import '../../widgets/language_switch_button.dart';
 import '../../models/provider_model.dart';
 import '../../theme/app_theme.dart';
 
@@ -205,7 +207,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'স্বাগতম, $name',
+                  '${context.watch<LanguageProvider>().t('welcome_greeting')}, $name',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -213,64 +215,75 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                     fontFamily: 'Baloo Da 2',
                   ),
                 ),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.terracottaGradient,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const LanguageSwitchButton(isDark: false),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.terracottaGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
             const SizedBox(height: 18),
 
             // Online / Offline Toggle Row
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppColors.panel,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.line),
-                boxShadow: AppTheme.softShadow,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isOnline ? '🟢 আপনি এখন অনলাইন' : '⚪ আপনি এখন অফলাইন',
-                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppColors.ink),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _isOnline ? 'নতুন কাজের অনুরোধ পাবেন' : 'অনুরোধ পেতে অনলাইন করুন',
-                          style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
-                        ),
-                      ],
-                    ),
+            Consumer<LanguageProvider>(
+              builder: (context, lang, _) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.panel,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.line),
+                    boxShadow: AppTheme.softShadow,
                   ),
-                  Switch(
-                    value: _isOnline,
-                    activeThumbColor: AppColors.success,
-                    activeTrackColor: AppColors.success.withValues(alpha: 0.3),
-                    inactiveThumbColor: AppColors.offline,
-                    inactiveTrackColor: AppColors.line,
-                    onChanged: _toggleOnlineStatus,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isOnline ? '🟢 ${lang.t('online')}' : '⚪ ${lang.t('offline')}',
+                              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppColors.ink),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _isOnline ? lang.t('status_available') : lang.t('status_unavailable'),
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isOnline,
+                        activeThumbColor: AppColors.success,
+                        activeTrackColor: AppColors.success.withValues(alpha: 0.3),
+                        inactiveThumbColor: AppColors.offline,
+                        inactiveTrackColor: AppColors.line,
+                        onChanged: _toggleOnlineStatus,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 24),
 
@@ -278,9 +291,9 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'নতুন কাজের অনুরোধ',
-                  style: TextStyle(
+                Text(
+                  context.watch<LanguageProvider>().t('new_requests_section'),
+                  style: const TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.bold,
                     color: AppColors.ink,
@@ -294,7 +307,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${_feedJobs.where((j) => j['status'] != 'skipped').length}টি',
+                    '${_feedJobs.where((j) => j['status'] != 'skipped').length}',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate),
                   ),
                 ),
@@ -748,30 +761,70 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
           const SizedBox(height: 16),
 
           // GPS update
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.terracotta),
-            icon: _isUpdatingLocation
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Icon(Icons.my_location, size: 18),
-            label: const Text('📍 বর্তমান জিপিএস অবস্থান আপডেট করুন'),
-            onPressed: _isUpdatingLocation ? null : _updateGPSLocation,
+          Consumer<LanguageProvider>(
+            builder: (context, lang, _) {
+              return ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.terracotta),
+                icon: _isUpdatingLocation
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.my_location, size: 18),
+                label: Text(lang.t('update_gps_btn')),
+                onPressed: _isUpdatingLocation ? null : _updateGPSLocation,
+              );
+            },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+
+          // Settings & Language Block
+          Consumer<LanguageProvider>(
+            builder: (context, lang, _) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: AppColors.panel,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.line),
+                  boxShadow: AppTheme.softShadow,
+                ),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Text('🌐', style: TextStyle(fontSize: 18)),
+                      title: Text(lang.t('language'), style: const TextStyle(fontSize: 13.5, color: AppColors.ink, fontWeight: FontWeight.w600)),
+                      subtitle: Text(lang.isEnglish ? 'English' : 'বাংলা', style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft)),
+                      trailing: const LanguageSwitchButton(isDark: false),
+                    ),
+                    const Divider(height: 1, color: AppColors.line),
+                    ListTile(
+                      leading: const Text('⚙️', style: TextStyle(fontSize: 18)),
+                      title: Text(lang.t('settings'), style: const TextStyle(fontSize: 13.5, color: AppColors.ink)),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.inkSoft),
+                      onTap: () => Navigator.pushNamed(context, '/settings'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
 
           // Logout
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.danger,
-              side: const BorderSide(color: AppColors.danger),
-              minimumSize: const Size.fromHeight(48),
-            ),
-            icon: const Icon(Icons.logout),
-            label: const Text('লগআউট করুন'),
-            onPressed: () async {
-              await auth.logout();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(context, '/role-select', (r) => false);
-              }
+          Consumer<LanguageProvider>(
+            builder: (context, lang, _) {
+              return OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: const BorderSide(color: AppColors.danger),
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                icon: const Icon(Icons.logout),
+                label: Text(lang.t('logout')),
+                onPressed: () async {
+                  await auth.logout();
+                  if (context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(context, '/role-select', (r) => false);
+                  }
+                },
+              );
             },
           ),
         ],
@@ -782,6 +835,7 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final lang = context.watch<LanguageProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.clayBg,
@@ -792,12 +846,19 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
               automaticallyImplyLeading: false,
               title: Text(
                 _currentIndex == 1
-                    ? 'কাজের ইতিহাস'
+                    ? lang.t('nav_history')
                     : _currentIndex == 2
-                        ? 'রেটিং ও রিভিউ'
-                        : 'কারিগর প্রোফাইল',
+                        ? lang.t('nav_rating')
+                        : lang.t('profile_title'),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: lang.t('settings'),
+                  onPressed: () => Navigator.pushNamed(context, '/settings'),
+                ),
+              ],
               elevation: 0,
             ),
       body: _isLoading
@@ -828,26 +889,26 @@ class _KarigorHomeScreenState extends State<KarigorHomeScreen> {
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
           onTap: (i) => setState(() => _currentIndex = i),
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'হোম',
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: const Icon(Icons.home),
+              label: lang.t('nav_dashboard'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.history_outlined),
-              activeIcon: Icon(Icons.history),
-              label: 'ইতিহাস',
+              icon: const Icon(Icons.history_outlined),
+              activeIcon: const Icon(Icons.history),
+              label: lang.t('nav_history'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.star_outline),
-              activeIcon: Icon(Icons.star),
-              label: 'রেটিং',
+              icon: const Icon(Icons.star_outline),
+              activeIcon: const Icon(Icons.star),
+              label: lang.t('nav_rating'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'প্রোফাইল',
+              icon: const Icon(Icons.person_outline),
+              activeIcon: const Icon(Icons.person),
+              label: lang.t('nav_profile'),
             ),
           ],
         ),

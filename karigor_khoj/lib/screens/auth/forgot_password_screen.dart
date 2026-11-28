@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
+import '../../services/language_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/language_switch_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -23,19 +26,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _resetPassword() async {
+    final lang = context.read<LanguageProvider>();
     final email = _emailController.text.trim();
     final newPassword = _passwordController.text;
 
     if (email.isEmpty || newPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('সব তথ্য পূরণ করুন')),
+        SnackBar(content: Text(lang.t('fill_all_fields'))),
       );
       return;
     }
 
     if (newPassword.length < 4) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে')),
+        SnackBar(content: Text(lang.t('password_min_length'))),
       );
       return;
     }
@@ -48,8 +52,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে। এখন লগইন করুন।'),
+          SnackBar(
+            content: Text(lang.t('password_reset_success')),
             backgroundColor: Colors.green,
           ),
         );
@@ -60,7 +64,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ ত্রুটি: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text('${lang.t('error')}: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -70,49 +74,79 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
     const primaryColor = AppColors.slate;
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       backgroundColor: AppColors.clayBg,
       appBar: AppBar(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
-        title: const Text('পাসওয়ার্ড ভুলে গেছেন?'),
+        leadingWidth: canPop ? 134 : 96,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (canPop)
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+              if (canPop) const SizedBox(width: 4),
+              const LanguageSwitchButton(isDark: true),
+            ],
+          ),
+        ),
+        title: Text(
+          lang.t('password_recovery_title'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, size: 20),
+            tooltip: lang.t('settings'),
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             const Icon(
               Icons.lock_reset_rounded,
-              size: 80,
+              size: 76,
               color: primaryColor,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'পাসওয়ার্ড রিসেট করুন',
+            Text(
+              lang.t('password_recovery_title'),
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: primaryColor),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'আপনার নিবন্ধিত ইমেইল এড্রেস এবং নতুন ৪-অক্ষরের পাসওয়ার্ড প্রদান করুন।',
+            Text(
+              lang.t('recovery_instruction'),
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 32),
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'ইমেইল এড্রেস',
-                prefixIcon: Icon(Icons.email),
-                hintText: 'example@mail.com',
+              decoration: InputDecoration(
+                labelText: lang.t('email_label'),
+                prefixIcon: const Icon(Icons.email),
+                hintText: lang.t('email_hint'),
               ),
             ),
             const SizedBox(height: 16),
@@ -120,7 +154,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               controller: _passwordController,
               obscureText: _obscurePassword,
               decoration: InputDecoration(
-                labelText: 'নতুন পাসওয়ার্ড (কমপক্ষে ৪ অক্ষর)',
+                labelText: '${lang.t('new_password_label')} (${lang.t('password_min_length')})',
                 prefixIcon: const Icon(Icons.lock),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -136,15 +170,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               onPressed: _isLoading ? null : _resetPassword,
               child: _isLoading
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('পাসওয়ার্ড রিসেট করুন',
-                      style: TextStyle(fontSize: 16)),
+                  : Text(lang.t('reset_password_btn'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 16),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'লগইন পেজে ফিরে যান',
-                style: TextStyle(color: primaryColor),
+              child: Text(
+                lang.t('back'),
+                style: const TextStyle(color: primaryColor),
               ),
             ),
           ],

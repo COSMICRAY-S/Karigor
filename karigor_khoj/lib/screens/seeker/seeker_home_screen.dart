@@ -7,6 +7,8 @@ import '../../services/karigor_repository.dart';
 import '../../models/provider_model.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/request_job_modal.dart';
+import '../../services/language_provider.dart';
+import '../../widgets/language_switch_button.dart';
 import 'all_karigors_screen.dart';
 import 'karigor_ai_chat_screen.dart';
 import 'karigor_direct_chat_screen.dart';
@@ -136,8 +138,9 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
   // ─── TAB 1: HOME ──────────────────────────────────────────
 
   Widget _buildHomeTab(AuthProvider auth) {
-    final userName = auth.currentUser?.name.isNotEmpty == true ? auth.currentUser!.name : 'রাফি';
-    final userInit = userName.trim().isNotEmpty ? userName.trim().substring(0, 1) : 'র';
+    final lang = context.watch<LanguageProvider>();
+    final userName = auth.currentUser?.name.isNotEmpty == true ? auth.currentUser!.name : (lang.isEnglish ? 'Rafi' : 'রাফি');
+    final userInit = userName.trim().isNotEmpty ? userName.trim().substring(0, 1) : 'R';
     final nearby = _repo.allProviders.take(4).toList();
 
     return RefreshIndicator(
@@ -153,7 +156,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'স্বাগতম, $userName 👋',
+                  '${lang.t('welcome_greeting')}, $userName 👋',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -161,22 +164,29 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                     fontFamily: 'Baloo Da 2',
                   ),
                 ),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.slateLightGradient,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    userInit,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const LanguageSwitchButton(isDark: false),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.slateLightGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        userInit,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -215,23 +225,23 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                       child: const Text('✨', style: TextStyle(fontSize: 22)),
                     ),
                     const SizedBox(width: 14),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'AI সহকারীকে বলুন আপনার সমস্যা',
-                            style: TextStyle(
+                            lang.t('ai_banner_title'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15.5,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Baloo Da 2',
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            'বাংলা বা বাংলিশে লিখুন, সরাসরি সমাধান মিলবে',
-                            style: TextStyle(
+                            lang.t('ai_banner_subtitle'),
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
                             ),
@@ -250,9 +260,9 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'সেবার ধরন',
-                  style: TextStyle(
+                Text(
+                  lang.t('popular_services'),
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: AppColors.ink,
@@ -264,13 +274,13 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const AllKarigorsScreen(title: 'সকল ধরনের কারিগর'),
+                        builder: (_) => AllKarigorsScreen(title: lang.t('cat_all')),
                       ),
                     );
                   },
-                  child: const Text(
-                    'সব দেখুন',
-                    style: TextStyle(
+                  child: Text(
+                    lang.t('view_all'),
+                    style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                       color: AppColors.terracotta,
@@ -285,10 +295,10 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildCategoryItem('🔌', 'ইলেকট্রিশিয়ান', 'ইলেকট্রিক'),
-                _buildCategoryItem('🔥', 'গ্যাস লাইন', 'গ্যাস'),
-                _buildCategoryItem('🚰', 'প্লাম্বার', 'প্লাম্ব'),
-                _buildCategoryItem('🪚', 'কাঠমিস্ত্রি', 'কাঠ'),
+                _buildCategoryItem('🔌', lang.t('cat_electrician'), 'ইলেকট্রিক'),
+                _buildCategoryItem('🔥', lang.t('cat_gas'), 'গ্যাস'),
+                _buildCategoryItem('🚰', lang.t('cat_plumber'), 'প্লাম্ব'),
+                _buildCategoryItem('🪚', lang.t('cat_carpenter'), 'কাঠ'),
               ],
             ),
             const SizedBox(height: 26),
@@ -297,9 +307,9 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'আপনার কাছের কারিগর',
-                  style: TextStyle(
+                Text(
+                  lang.t('nearby_karigors'),
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: AppColors.ink,
@@ -311,13 +321,13 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const AllKarigorsScreen(title: 'আশেপাশের সকল কারিগর'),
+                        builder: (_) => AllKarigorsScreen(title: lang.t('nearby_karigors')),
                       ),
                     );
                   },
-                  child: const Text(
-                    'সব দেখুন',
-                    style: TextStyle(
+                  child: Text(
+                    lang.t('view_all'),
+                    style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                       color: AppColors.terracotta,
@@ -379,6 +389,8 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
   }
 
   Widget _buildKarigorCard(ProviderModel k) {
+    final lang = context.watch<LanguageProvider>();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -440,7 +452,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  k.category,
+                  lang.trCategory(k.category),
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
@@ -451,12 +463,12 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                 Row(
                   children: [
                     Text(
-                      k.isOnline ? '🟢 অনলাইন' : '⚪ অফলাইন',
+                      k.isOnline ? '🟢 ${lang.t('online')}' : '⚪ ${lang.t('offline')}',
                       style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '📍 ${k.distance.toStringAsFixed(1)} কিমি',
+                      '📍 ${k.distance.toStringAsFixed(1)} ${lang.t('km_away')}',
                       style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
                     ),
                     const SizedBox(width: 8),
@@ -472,16 +484,16 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildSmallBtn('📞 কল', AppColors.clayBg, AppColors.slate, () => _callProvider(k)),
+              _buildSmallBtn('📞 ${lang.t('call')}', AppColors.clayBg, AppColors.slate, () => _callProvider(k)),
               const SizedBox(height: 6),
-              _buildSmallBtn('💬 চ্যাট', AppColors.sageBg, AppColors.slate, () {
+              _buildSmallBtn('💬 ${lang.t('message')}', AppColors.sageBg, AppColors.slate, () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => KarigorDirectChatScreen(karigor: k)),
                 );
               }),
               const SizedBox(height: 6),
-              _buildSmallBtn('অনুরোধ', AppColors.terracotta, Colors.white, () {
+              _buildSmallBtn(lang.t('request_service_btn'), AppColors.terracotta, Colors.white, () {
                 RequestJobModal.show(context, karigor: k);
               }),
             ],
@@ -1010,38 +1022,58 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
           const SizedBox(height: 24),
 
           // Account Options
-          const Text(
-            'অ্যাকাউন্ট',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink, fontFamily: 'Baloo Da 2'),
+          Text(
+            context.watch<LanguageProvider>().t('account_section_title'),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink, fontFamily: 'Baloo Da 2'),
           ),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.panel,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.line),
-              boxShadow: AppTheme.softShadow,
-            ),
-            child: Column(
-              children: [
-                _buildSettingsRow('⚙️', 'সেটিংস'),
-                const Divider(height: 1, color: AppColors.line),
-                _buildSettingsRow('🛎️', 'নোটিফিকেশন'),
-                const Divider(height: 1, color: AppColors.line),
-                _buildSettingsRow('❓', 'সাহায্য'),
-                const Divider(height: 1, color: AppColors.line),
-                ListTile(
-                  leading: const Text('🚪', style: TextStyle(fontSize: 18)),
-                  title: const Text('লগআউট', style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold, fontSize: 13.5)),
-                  onTap: () async {
-                    await auth.logout();
-                    if (context.mounted) {
-                      Navigator.pushNamedAndRemoveUntil(context, '/role-select', (r) => false);
-                    }
-                  },
+          Consumer<LanguageProvider>(
+            builder: (context, lang, _) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: AppColors.panel,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.line),
+                  boxShadow: AppTheme.softShadow,
                 ),
-              ],
-            ),
+                child: Column(
+                  children: [
+                    // Language Switcher Tile
+                    ListTile(
+                      leading: const Text('🌐', style: TextStyle(fontSize: 18)),
+                      title: Text(lang.t('language'), style: const TextStyle(fontSize: 13.5, color: AppColors.ink, fontWeight: FontWeight.w600)),
+                      subtitle: Text(lang.isEnglish ? 'English' : 'বাংলা', style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft)),
+                      trailing: const LanguageSwitchButton(isDark: false),
+                    ),
+                    const Divider(height: 1, color: AppColors.line),
+                    _buildSettingsRow(
+                      '⚙️',
+                      lang.t('settings'),
+                      onTap: () => Navigator.pushNamed(context, '/settings'),
+                    ),
+                    const Divider(height: 1, color: AppColors.line),
+                    _buildSettingsRow(
+                      '🛎️',
+                      lang.t('notifications'),
+                      onTap: () => Navigator.pushNamed(context, '/settings'),
+                    ),
+                    const Divider(height: 1, color: AppColors.line),
+                    _buildSettingsRow('❓', lang.t('help_support')),
+                    const Divider(height: 1, color: AppColors.line),
+                    ListTile(
+                      leading: const Text('🚪', style: TextStyle(fontSize: 18)),
+                      title: Text(lang.t('logout'), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      onTap: () async {
+                        await auth.logout();
+                        if (context.mounted) {
+                          Navigator.pushNamedAndRemoveUntil(context, '/role-select', (r) => false);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 20),
         ],
@@ -1049,16 +1081,17 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
     );
   }
 
-  Widget _buildSettingsRow(String icon, String label) {
+  Widget _buildSettingsRow(String icon, String label, {VoidCallback? onTap}) {
     return ListTile(
       leading: Text(icon, style: const TextStyle(fontSize: 18)),
       title: Text(label, style: const TextStyle(fontSize: 13.5, color: AppColors.ink)),
       trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.inkSoft),
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label শীঘ্রই আসছে')),
-        );
-      },
+      onTap: onTap ??
+          () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$label শীঘ্রই আসছে')),
+            );
+          },
     );
   }
 
@@ -1067,6 +1100,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final lang = context.watch<LanguageProvider>();
 
     return ListenableBuilder(
       listenable: _repo,
@@ -1079,9 +1113,16 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                   backgroundColor: AppColors.panel,
                   automaticallyImplyLeading: false,
                   title: Text(
-                    _currentIndex == 2 ? 'আমার অনুরোধসমূহ' : 'প্রোফাইল',
+                    _currentIndex == 2 ? lang.t('my_requests_title') : lang.t('profile_title'),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined),
+                      tooltip: lang.t('settings'),
+                      onPressed: () => Navigator.pushNamed(context, '/settings'),
+                    ),
+                  ],
                   elevation: 0,
                 ),
           body: SafeArea(
@@ -1119,26 +1160,26 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                   setState(() => _currentIndex = i);
                 }
               },
-              items: const [
+              items: [
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.home_outlined),
-                  activeIcon: Icon(Icons.home),
-                  label: 'হোম',
+                  icon: const Icon(Icons.home_outlined),
+                  activeIcon: const Icon(Icons.home),
+                  label: lang.t('nav_home'),
                 ),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                   icon: Icon(Icons.auto_awesome_outlined),
                   activeIcon: Icon(Icons.auto_awesome),
-                  label: 'AI চ্যাট',
+                  label: 'AI Chat',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.receipt_long_outlined),
-                  activeIcon: Icon(Icons.receipt_long),
-                  label: 'অনুরোধ',
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  activeIcon: const Icon(Icons.receipt_long),
+                  label: lang.t('nav_requests'),
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.person_outline),
-                  activeIcon: Icon(Icons.person),
-                  label: 'প্রোফাইল',
+                  icon: const Icon(Icons.person_outline),
+                  activeIcon: const Icon(Icons.person),
+                  label: lang.t('nav_profile'),
                 ),
               ],
             ),

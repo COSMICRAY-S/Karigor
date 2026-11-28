@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_provider.dart';
+import '../services/language_provider.dart';
 import '../models/user_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/language_switch_button.dart';
 
 class RoleSelectScreen extends StatefulWidget {
   const RoleSelectScreen({super.key});
@@ -72,6 +74,8 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -81,10 +85,23 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
             child: Column(
               children: [
+                // Top Header: Language Switch in Top-Left Corner
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const LanguageSwitchButton(isDark: true),
+                    IconButton(
+                      icon: Icon(Icons.settings_outlined, color: Colors.white.withValues(alpha: 0.8), size: 22),
+                      tooltip: lang.t('settings'),
+                      onPressed: () => Navigator.pushNamed(context, '/settings'),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
+
                 // Brand Mark
                 Container(
                   width: 74,
@@ -98,9 +115,9 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                   child: const Text('🛠️', style: TextStyle(fontSize: 34)),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'কারিগর খোঁজ',
-                  style: TextStyle(
+                Text(
+                  lang.t('app_name'),
+                  style: const TextStyle(
                     fontFamily: 'Baloo Da 2',
                     fontSize: 30,
                     fontWeight: FontWeight.bold,
@@ -110,21 +127,22 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'আপনার এলাকার বিশ্বস্ত কারিগর, এক ট্যাপে',
+                  lang.t('tagline'),
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13.5,
                     color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
                 // Role Cards
                 _buildRoleCard(
                   roleKey: 'seeker',
                   iconText: '🔍',
                   iconGradient: AppColors.brassGradient,
-                  title: 'আমি সেবা খুঁজছি',
-                  subtitle: 'প্লাম্বার, ইলেকট্রিশিয়ান বা অন্য কারিগর দরকার',
+                  title: lang.t('seeker_card_title'),
+                  subtitle: lang.t('seeker_card_subtitle'),
                   selectedColor: AppColors.brass,
                 ),
                 const SizedBox(height: 14),
@@ -132,12 +150,12 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                   roleKey: 'karigor',
                   iconText: '🔧',
                   iconGradient: AppColors.terracottaGradient,
-                  title: 'আমি একজন কারিগর',
-                  subtitle: 'আমার দক্ষতা দিয়ে অন্যদের সাহায্য করতে চাই',
+                  title: lang.t('karigor_card_title'),
+                  subtitle: lang.t('karigor_card_subtitle'),
                   selectedColor: AppColors.terracotta,
                 ),
 
-                const SizedBox(height: 36),
+                const SizedBox(height: 32),
 
                 // Auth Block
                 Container(
@@ -152,7 +170,7 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 14),
                     decoration: InputDecoration(
                       icon: Icon(Icons.mail_outline, color: Colors.white.withValues(alpha: 0.6), size: 18),
-                      hintText: 'ইমেইল অথবা মোবাইল নম্বর',
+                      hintText: lang.t('email_phone_hint'),
                       hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 13.5),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -175,7 +193,7 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 14),
                     decoration: InputDecoration(
                       icon: Icon(Icons.lock_outline, color: Colors.white.withValues(alpha: 0.6), size: 18),
-                      hintText: 'পাসওয়ার্ড',
+                      hintText: lang.t('password_hint'),
                       hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 13.5),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -206,14 +224,14 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                           height: 22,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text(
-                          'প্রবেশ করুন',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      : Text(
+                          lang.t('sign_in_btn'),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'প্রোটোটাইপ — সরাসরি প্রবেশ করুন অথবা নিচে নিবন্ধন করুন',
+                  lang.t('prototype_note'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.45)),
                 ),
@@ -227,7 +245,7 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                         Navigator.pushNamed(context, '/register', arguments: _selectedRole);
                       },
                       child: Text(
-                        'নতুন অ্যাকাউন্ট তৈরি করুন',
+                        lang.t('create_account_btn'),
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.85),
                           fontSize: 13,
@@ -241,7 +259,7 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                         Navigator.pushNamed(context, '/forgot-password');
                       },
                       child: Text(
-                        'পাসওয়ার্ড ভুলে গেছেন?',
+                        lang.t('forgot_password_btn'),
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 12,

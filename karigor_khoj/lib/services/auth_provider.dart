@@ -2,16 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import 'api_service.dart';
+import 'language_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _error;
+  LanguageProvider? _languageProvider;
 
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isLoggedIn => _currentUser != null;
+
+  void attachLanguageProvider(LanguageProvider lang) {
+    _languageProvider = lang;
+  }
 
   // App চালু হলে saved user check করো
   Future<void> loadSavedUser() async {
@@ -32,6 +38,7 @@ class AuthProvider extends ChangeNotifier {
         role: userRole ?? 'seeker',
         token: token,
       );
+      _languageProvider?.onUserChanged(userId);
       notifyListeners();
     }
   }
@@ -53,6 +60,8 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString('user_phone', result.phone ?? '');
         await prefs.setString('user_email', result.email ?? '');
         await prefs.setString('user_role', result.role);
+        
+        await _languageProvider?.onUserChanged(result.id);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -83,6 +92,8 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString('user_phone', result.phone ?? '');
         await prefs.setString('user_email', result.email ?? '');
         await prefs.setString('user_role', result.role);
+
+        await _languageProvider?.onUserChanged(result.id);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -99,7 +110,15 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _currentUser = null;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Do not wipe language preferences! Only remove session auth keys.
+    await prefs.remove('token');
+    await prefs.remove('user_id');
+    await prefs.remove('user_name');
+    await prefs.remove('user_phone');
+    await prefs.remove('user_email');
+    await prefs.remove('user_role');
+
+    await _languageProvider?.onUserChanged(null);
     notifyListeners();
   }
 }

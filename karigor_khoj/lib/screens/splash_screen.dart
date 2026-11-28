@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
+import '../../services/language_provider.dart';
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -75,23 +76,32 @@ class _SplashScreenState extends State<SplashScreen>
                   child: const Text('🛠️', style: TextStyle(fontSize: 42)),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'কারিগর খোঁজ',
-                  style: TextStyle(
-                    fontFamily: 'Baloo Da 2',
-                    fontSize: 34,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'আপনার এলাকার বিশ্বস্ত কারিগর, এক ট্যাপে',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.75),
-                  ),
+                Consumer<LanguageProvider>(
+                  builder: (context, lang, _) {
+                    return Column(
+                      children: [
+                        Text(
+                          lang.t('app_name'),
+                          style: const TextStyle(
+                            fontFamily: 'Baloo Da 2',
+                            fontSize: 34,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          lang.t('tagline'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withValues(alpha: 0.75),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 44),
                 const SizedBox(

@@ -11,6 +11,7 @@ import 'screens/seeker/all_karigors_screen.dart';
 import 'screens/seeker/karigor_ai_chat_screen.dart';
 import 'screens/karigor/karigor_home_screen.dart';
 import 'screens/karigor/karigor_profile_screen.dart';
+import 'screens/settings_screen.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -27,6 +28,8 @@ class AppRouter {
       case '/register':
         final role = settings.arguments as String? ?? 'seeker';
         return MaterialPageRoute(builder: (_) => RegisterScreen(role: role));
+      case '/settings':
+        return MaterialPageRoute(builder: (_) => const SettingsScreen());
       case '/seeker-home':
         return MaterialPageRoute(builder: (_) => const SeekerHomeScreen());
       case '/search':

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
+import '../../services/language_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/language_switch_button.dart';
 
 class RegisterScreen extends StatefulWidget {
   final String role;
@@ -28,19 +30,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
+    final lang = context.read<LanguageProvider>();
     if (_nameController.text.isEmpty ||
         _phoneController.text.isEmpty ||
         _emailController.text.trim().isEmpty ||
         _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('সব তথ্য পূরণ করুন')),
+        SnackBar(content: Text(lang.t('fill_all_fields'))),
       );
       return;
     }
 
     if (_passwordController.text.length < 4) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে')),
+        SnackBar(content: Text(lang.t('password_min_length'))),
       );
       return;
     }
@@ -61,7 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } else if (mounted && auth.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('নিবন্ধন ব্যর্থ: ${auth.error.toString().replaceAll('Exception: ', '')}'),
+          content: Text('${lang.t('error')}: ${auth.error.toString().replaceAll('Exception: ', '')}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -70,58 +73,88 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
     final isKarigor = widget.role == 'karigor';
     final primaryColor = isKarigor ? AppColors.terracotta : AppColors.slate;
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       backgroundColor: AppColors.clayBg,
       appBar: AppBar(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
-        title: const Text('নিবন্ধন করুন'),
+        leadingWidth: canPop ? 134 : 96,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (canPop)
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+              if (canPop) const SizedBox(width: 4),
+              const LanguageSwitchButton(isDark: true),
+            ],
+          ),
+        ),
+        title: Text(
+          lang.t('register_title'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, size: 20),
+            tooltip: lang.t('settings'),
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Text(
               isKarigor
-                  ? 'কারিগর হিসেবে নিবন্ধন করুন'
-                  : 'সেবা গ্রহণকারী হিসেবে নিবন্ধন করুন',
+                  ? lang.t('karigor_reg_heading')
+                  : lang.t('seeker_reg_heading'),
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: primaryColor),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'পূর্ণ নাম',
-                prefixIcon: Icon(Icons.person),
+              decoration: InputDecoration(
+                labelText: lang.t('full_name_label'),
+                prefixIcon: const Icon(Icons.person),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'মোবাইল নম্বর',
-                prefixIcon: Icon(Icons.phone),
-                hintText: '01XXXXXXXXX',
+              decoration: InputDecoration(
+                labelText: lang.t('phone_label'),
+                prefixIcon: const Icon(Icons.phone),
+                hintText: lang.t('phone_hint'),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'ইমেইল এড্রেস',
-                prefixIcon: Icon(Icons.email),
-                hintText: 'example@mail.com',
+              decoration: InputDecoration(
+                labelText: lang.t('email_label'),
+                prefixIcon: const Icon(Icons.email),
+                hintText: lang.t('email_hint'),
               ),
             ),
             const SizedBox(height: 16),
@@ -129,7 +162,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: _passwordController,
               obscureText: _obscurePassword,
               decoration: InputDecoration(
-                labelText: 'পাসওয়ার্ড (কমপক্ষে ৪ অক্ষর)',
+                labelText: '${lang.t('password_label')} (${lang.t('password_min_length')})',
                 prefixIcon: const Icon(Icons.lock),
                 suffixIcon: IconButton(
                   icon: Icon(_obscurePassword
@@ -140,30 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
-            if (isKarigor) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'নিবন্ধনের পর NID ও সার্টিফিকেট আপলোড করতে হবে। যাচাইয়ের পর আপনার প্রোফাইল সক্রিয় হবে।',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 32),
+            const SizedBox(height: 30),
             Consumer<AuthProvider>(
               builder: (_, auth, __) {
                 return ElevatedButton(
@@ -172,8 +182,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: auth.isLoading ? null : _register,
                   child: auth.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('নিবন্ধন করুন',
-                          style: TextStyle(fontSize: 16)),
+                      : Text(lang.t('register_btn'),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 );
               },
             ),
@@ -183,7 +193,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   context, '/login',
                   arguments: widget.role),
               child: Text(
-                'ইতিমধ্যে অ্যাকাউন্ট আছে? লগইন করুন',
+                lang.t('already_have_account'),
                 style: TextStyle(color: primaryColor),
               ),
             ),
