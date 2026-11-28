@@ -44,6 +44,23 @@ The app features a culturally inspired terracotta and brass design system along 
 - **"আমার চ্যাটসমূহ"**: Direct access to ongoing conversations with Karigors.
 - Account settings and secure logout.
 
+### 8. **Multilingual Support (English / Bangla) & Language Switcher**
+- **Top-Left Quick Switcher**: Interactive toggle pill (`[ 🌐 EN | বাং ]`) placed at the top-left corner of the Login, Role Selection / Sign-In, Registration, and Password Recovery pages for one-tap switching before or during authentication.
+- **In-App Settings Screen**: Dedicated App Settings screen (`/settings`) accessible from the Profile tab in both Seeker and Karigor dashboards, featuring an interactive language selection card with active checkmarks and flags (`🇺🇸 English` / `🇧🇩 বাংলা`).
+- **Individual User State Persistence**:
+  - Stores each user's language preference individually in `SharedPreferences` (`user_language_<userId>`).
+  - Seamlessly restores the individual user's saved language upon login, across sessions and devices.
+  - Safe logout preserves stored user language preferences while clearing session auth credentials.
+- **Initial English Default**: The application initializes in **English** by default, allowing effortless alternating to Bangla anytime.
+- **Full Reactive Localization (`LanguageProvider` & `AppTranslations`)**:
+  - All critical sections dynamically react to language changes without restarting the app:
+    - Authentication, Role Selection, and Password Recovery screens.
+    - Seeker Home, Promotional AI Assistant banner, and Bottom Navigation.
+    - Karigor Dashboard, Online/Offline availability toggle, and Incoming Job Feed.
+    - Categories (e.g. *Electrician* ↔ *ইলেকট্রিশিয়ান*, *Plumber* ↔ *প্লাম্বার*).
+    - Status badges (*Pending* ↔ *অপেক্ষমান*, *Accepted* ↔ *গৃহীত*, *Completed* ↔ *সম্পন্ন*).
+    - Provider cards, ratings, reviews, and distance metrics (*km away* ↔ *কিমি দূরে*).
+
 ---
 
 ## Key Backend & Full-Stack Capabilities
@@ -61,6 +78,7 @@ The app features a culturally inspired terracotta and brass design system along 
 ### Frontend
 - **Flutter** & **Dart**
 - State Management: `Provider` & `ChangeNotifier`
+- Localization: Custom reactive `LanguageProvider` & `AppTranslations` (English & Bangla with per-user persistence)
 - Networking: `http` (REST API client)
 - Location Services: `geolocator`, `geocoding`
 - Local Storage: `shared_preferences`

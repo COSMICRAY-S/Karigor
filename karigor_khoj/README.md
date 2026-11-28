@@ -1,16 +1,23 @@
-# karigor_khoj
+# Karigor Khoj (Frontend App)
 
-A new Flutter project.
+The Flutter mobile client for **Karigor Khoj** — a local service provider and gig worker directory connecting service seekers with skilled workers.
 
-## Getting Started
+## ✨ Key Features
 
-This project is a starting point for a Flutter application.
+- **Multilingual Support (English / Bangla)**:
+  - Default initial language: **English** (`en`).
+  - Top-left quick toggle (`[ 🌐 EN | বাং ]`) on Login, Role Selection, Registration, and Forgot Password pages.
+  - In-app **Settings Screen** (`/settings`) with selectable language cards.
+  - Per-user language persistence saved individually under `user_language_<userId>`.
+  - Comprehensive translations covering all sections, categories, and job statuses.
+- **AI Assistant**: Natural language intent & trade classification supporting English, Bangla, and Banglish.
+- **Location-based Provider Discovery**: Real-time GPS distance calculation and nearby provider list.
+- **Seeker & Karigor Workflows**: Job requests bottom sheet, direct chat, provider ratings, and provider dashboard with live online/offline toggle.
+- **Terracotta & Brass Theme**: Custom theme with Material 3 styling.
 
-A few resources to get you started if this is your first Flutter project:
+## 🚀 Getting Started
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter run
+```
